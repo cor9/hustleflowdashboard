@@ -1,11 +1,20 @@
-import '../styles/globals.css'
+import { NextPage } from 'next'
 import type { AppProps } from 'next/app'
 import DesignLayout from '../components/DesignLayout'
+import '../styles/globals.css'
+import '../styles/hustle-dashboard.css'
 
-export default function App({ Component, pageProps }: AppProps) {
-  return (
-    <DesignLayout>
-      <Component {...pageProps} />
-    </DesignLayout>
-  )
+export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
+  getLayout?: (page: React.ReactElement) => React.ReactNode
+}
+
+type AppPropsWithLayout = AppProps & {
+  Component: NextPageWithLayout
+}
+
+export default function App({ Component, pageProps }: AppPropsWithLayout) {
+  // Use the layout defined at the page level, if available
+  const getLayout = Component.getLayout ?? ((page) => <DesignLayout>{page}</DesignLayout>)
+
+  return getLayout(<Component {...pageProps} />)
 }

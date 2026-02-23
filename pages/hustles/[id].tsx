@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
+import { supabase } from "../../lib/supabase";
 
+// ── TYPES ────────────────────────────────────────────────
 interface Task {
   id: string;
   title: string;
@@ -21,531 +23,697 @@ interface Project {
   goal: number;
   status: "active" | "passive" | "paused" | "archived";
   tier: string;
-  created_at: string;
+  created_at?: string;
 }
 
-const SUPABASE_URL = "https://uxrpljylbhifolcqslju.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4cnBsanlsYmhpZm9sY3FzbGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDgzNzAsImV4cCI6MjA4NjY4NDM3MH0.WMR3fZpubA-lEGUWCMwqFya5Nucg17LHR5pNRCpitEs";
-
+// ── CONSTANTS ────────────────────────────────────────────
 const AGENTS = [
-  { name: "Coco", color: "#1EC9A0", bg: "rgba(30,201,160,.18)", role: "Partner" },
-  { name: "Max", color: "#3D7EFF", bg: "rgba(61,126,255,.18)", role: "Content" },
-  { name: "Chaz", color: "#F0A832", bg: "rgba(240,168,50,.18)", role: "Revenue" },
-  { name: "Sheila", color: "#A855F7", bg: "rgba(168,85,247,.18)", role: "Research" },
-  { name: "Bob", color: "#6B7A9F", bg: "rgba(107,122,159,.18)", role: "Builder" },
+  { name: 'Coco', color: '#1EC9A0', bg: 'rgba(30,201,160,.18)', role: 'Research · Analysis', tier: 'T1 Flash' },
+  { name: 'Max', color: '#3D7EFF', bg: 'rgba(61,126,255,.18)', role: 'Strategy · Planning', tier: 'T1 Flash' },
+  { name: 'Chaz', color: '#F0A832', bg: 'rgba(240,168,50,.18)', role: 'Copywriting · Voice', tier: 'T2 Haiku' },
+  { name: 'Sheila', color: '#A855F7', bg: 'rgba(168,85,247,.18)', role: 'Creative · Design notes', tier: 'T2 Haiku' },
+  { name: 'Bob', color: '#6B7A9F', bg: 'rgba(107,122,159,.18)', role: 'Utility · Local tasks', tier: 'T0 Ollama' },
 ];
 
-const DEMO_PROJECT: Project = {
-  id: "demo",
-  name: "CA101",
-  description: "Child Actor 101 — core brand",
-  budget: 500,
-  revenue: 312,
-  goal: 500,
-  status: "active",
-  tier: "P1 · Primary Engine",
-  created_at: new Date(Date.now() - 8 * 86400000).toISOString(),
+const STATUS_LABEL: Record<string, string> = {
+  todo: 'Todo',
+  progress: 'In Progress',
+  review: 'Review',
+  done: 'Done',
+  blocked: 'Blocked'
 };
 
-const DEMO_TASKS: Task[] = [
-  {
-    id: "t1",
-    title: "Update parent workshop email sequences",
-    status: "todo",
-    priority: "urgent",
-    assigned_agent: "Coco",
-    hustle_id: "demo",
-  },
-  {
-    id: "t2",
-    title: "Draft blog: How to spot a legit agent",
-    status: "progress",
-    priority: "high",
-    assigned_agent: "Max",
-    hustle_id: "demo",
-  },
-  {
-    id: "t3",
-    title: "Schedule March workshop",
-    status: "todo",
-    priority: "medium",
-    hustle_id: "demo",
-  },
-];
+const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'];
 
-export default function ProjectPage() {
+const DEMO = {
+  project: {
+    id: 'demo', name: 'CA101', description: 'Child Actor 101 — core brand: blog, social, parent classes, workshops, and the 11K+ member community. Everything in the ecosystem traces back here.',
+    budget: 500, revenue: 312, goal: 500, status: 'active' as const, tier: 'P1 · Primary Engine',
+    created_at: new Date(Date.now() - 8 * 86400000).toISOString(),
+  },
+  tasks: [
+    { id: 't1', title: 'Update parent workshop email sequences', status: 'todo' as const, priority: 'urgent' as const, assigned_agent: 'Coco', hustle_id: 'demo' },
+    { id: 't2', title: 'Draft blog: "How to spot a legit agent"', status: 'progress' as const, priority: 'high' as const, assigned_agent: 'Chaz', hustle_id: 'demo' },
+    { id: 't3', title: 'Schedule March workshop on calendar', status: 'todo' as const, priority: 'medium' as const, assigned_agent: '', hustle_id: 'demo' },
+    { id: 't4', title: 'Q1 community engagement metrics report', status: 'review' as const, priority: 'medium' as const, assigned_agent: 'Max', hustle_id: 'demo' },
+    { id: 't5', title: 'Update FAQ with new CA entertainment law', status: 'done' as const, priority: 'low' as const, assigned_agent: 'Coco', hustle_id: 'demo' },
+    { id: 't6', title: 'Feb social media content calendar', status: 'done' as const, priority: 'high' as const, assigned_agent: 'Sheila', hustle_id: 'demo' },
+  ],
+};
+
+// ── COMPONENT ────────────────────────────────────────────
+export default function ProjectDashboard() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id: projectId } = router.query;
+
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-  const [editingProject, setEditingProject] = useState(false);
-  const [editingTask, setEditingTask] = useState<string | null>(null);
-  const [newTask, setNewTask] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [sortMode, setSortMode] = useState(0); // 0=priority desc, 1=priority asc, 2=newest
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<any[]>([]);
 
+  // Modal / Form states
+  const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
+  const [isEditTaskOpen, setIsEditTaskOpen] = useState(false);
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Form input states
+  const [nTitle, setNTitle] = useState('');
+  const [nStatus, setNStatus] = useState<'todo' | 'progress' | 'review' | 'blocked'>('todo');
+  const [nPriority, setNPriority] = useState<Task['priority']>('medium');
+  const [nAgent, setNAgent] = useState('');
+
+  const [eName, setEName] = useState('');
+  const [eDesc, setEDesc] = useState('');
+  const [eBudget, setEBudget] = useState('');
+  const [eGoal, setEGoal] = useState('');
+  const [eStatus, setEStatus] = useState<Project['status']>('active');
+  const [eTier, setETier] = useState('P1 · Primary Engine');
+
+  const [etTitle, setEtTitle] = useState('');
+  const [etStatus, setEtStatus] = useState<Task['status']>('todo');
+  const [etPriority, setEtPriority] = useState<Task['priority']>('medium');
+  const [etAgent, setEtAgent] = useState('');
+
+  // ── INIT ───────────────────────────────────────────────
   useEffect(() => {
-    if (!id) return;
-    fetchProject();
-  }, [id]);
+    if (!projectId) return;
+    if (projectId === 'demo') {
+      loadDemo();
+    } else {
+      fetchProject();
+    }
+  }, [projectId]);
+
+  const loadDemo = () => {
+    setProject({ ...DEMO.project });
+    setTasks([...DEMO.tasks]);
+    setLoading(false);
+  };
 
   const fetchProject = async () => {
     try {
       setLoading(true);
-      const projRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/hustles?id=eq.${id}&select=*`,
-        { headers: { apikey: SUPABASE_KEY } }
-      );
-      const projData = await projRes.json();
-      if (projData.length > 0) {
-        setProject(projData[0]);
-      } else {
-        setProject(DEMO_PROJECT);
-      }
+      const { data: p, error: pe } = await supabase
+        .from('hustles').select('*').eq('id', projectId).single();
+      if (pe || !p) throw pe;
+      setProject(p);
 
-      const tasksRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/tasks?hustle_id=eq.${id}&select=*&order=created_at.desc`,
-        { headers: { apikey: SUPABASE_KEY } }
-      );
-      const tasksData = await tasksRes.json();
-      setTasks(tasksData.length > 0 ? tasksData : DEMO_TASKS);
+      const { data: t, error: te } = await supabase
+        .from('tasks').select('*').eq('hustle_id', projectId)
+        .order('created_at', { ascending: false });
+      if (te) throw te;
+      setTasks(t || []);
     } catch (err) {
       console.error(err);
-      setProject(DEMO_PROJECT);
-      setTasks(DEMO_TASKS);
+      addToast('Could not load project — showing demo', 'err');
+      loadDemo();
     } finally {
       setLoading(false);
     }
   };
 
-  const addTask = async (title: string, status: string, priority: string, agent: string) => {
-    const task: Task = {
-      id: `tmp-${Date.now()}`,
-      title,
-      status: status as Task["status"],
-      priority: priority as Task["priority"],
-      assigned_agent: agent || undefined,
-      hustle_id: id as string,
+  // ── ACTIONS ────────────────────────────────────────────
+  const addToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  };
+
+  const handleAddTask = async () => {
+    if (!nTitle.trim()) { addToast('Title is required', 'err'); return; }
+
+    const newTaskObj: Partial<Task> = {
+      title: nTitle,
+      status: nStatus,
+      priority: nPriority,
+      assigned_agent: nAgent || undefined,
+      hustle_id: projectId as string,
     };
-    setTasks([task, ...tasks]);
-    setNewTask(false);
 
-    if (id !== "demo") {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_KEY,
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-          },
-          body: JSON.stringify({
-            title,
-            status,
-            priority,
-            assigned_agent: agent || null,
-            hustle_id: id,
-          }),
-        });
-        const data = await res.json();
-        if (data[0]) {
-          setTasks(tasks.map(t => (t.id === task.id ? data[0] : t)));
-        }
-      } catch (err) {
-        console.error(err);
-      }
+    if (projectId === 'demo') {
+      const demoTask = { ...newTaskObj, id: 'tmp-' + Date.now() } as Task;
+      setTasks(prev => [demoTask, ...prev]);
+      addToast('✓ Task added (Demo Mode)', 'ok');
+      closeAddForm();
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.from('tasks')
+        .insert({ ...newTaskObj, assigned_agent: nAgent || null })
+        .select().single();
+      if (error) throw error;
+      setTasks(prev => [data, ...prev]);
+      addToast('✓ Task added', 'ok');
+      closeAddForm();
+    } catch (error: any) {
+      addToast('Save failed: ' + error.message, 'err');
     }
   };
 
-  const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    setTasks(tasks.map(t => (t.id === taskId ? { ...t, ...updates } : t)));
-    setEditingTask(null);
+  const toggleDone = async (task: Task) => {
+    const nextStatus: Task['status'] = task.status === 'done' ? 'todo' : 'done';
 
-    if (id !== "demo") {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${taskId}`, {
-          method: "PATCH",
-          headers: {
-            apikey: SUPABASE_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updates),
-        });
-      } catch (err) {
-        console.error(err);
-      }
+    if (projectId === 'demo') {
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: nextStatus } : t));
+      addToast(nextStatus === 'done' ? '✓ Completed' : '↩ Reopened', 'ok');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('tasks').update({ status: nextStatus }).eq('id', task.id);
+      if (error) throw error;
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: nextStatus } : t));
+      addToast(nextStatus === 'done' ? '✓ Completed' : '↩ Reopened', 'ok');
+    } catch (error: any) {
+      addToast('Update failed: ' + error.message, 'err');
     }
   };
 
-  const deleteTask = async (taskId: string) => {
-    setTasks(tasks.filter(t => t.id !== taskId));
+  const handleDeleteTask = async (taskId: string) => {
+    if (projectId === 'demo') {
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      addToast('🗑 Deleted (Demo Mode)', 'ok');
+      return;
+    }
 
-    if (id !== "demo") {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/tasks?id=eq.${taskId}`, {
-          method: "DELETE",
-          headers: { apikey: SUPABASE_KEY },
-        });
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+      if (error) throw error;
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      addToast('🗑 Deleted', 'ok');
+    } catch (error: any) {
+      addToast('Delete failed: ' + error.message, 'err');
     }
   };
 
-  const updateProject = async (updates: Partial<Project>) => {
-    setProject(project ? { ...project, ...updates } : null);
-    setEditingProject(false);
+  const assignAgent = async (taskId: string, agentName: string) => {
+    setOpenDropdown(null);
+    if (projectId === 'demo') {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, assigned_agent: agentName } : t));
+      addToast(agentName ? `→ Assigned to ${agentName}` : 'Agent removed', 'ok');
+      return;
+    }
 
-    if (id !== "demo" && project) {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/hustles?id=eq.${id}`, {
-          method: "PATCH",
-          headers: {
-            apikey: SUPABASE_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(updates),
-        });
-      } catch (err) {
-        console.error(err);
-      }
+    try {
+      const { error } = await supabase.from('tasks')
+        .update({ assigned_agent: agentName || null })
+        .eq('id', taskId);
+      if (error) throw error;
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, assigned_agent: agentName } : t));
+      addToast(agentName ? `→ Assigned to ${agentName}` : 'Agent removed', 'ok');
+    } catch (error: any) {
+      addToast('Update failed: ' + error.message, 'err');
     }
   };
+
+  const openEditTask = (task: Task) => {
+    setEditingTask(task);
+    setEtTitle(task.title);
+    setEtStatus(task.status);
+    setEtPriority(task.priority);
+    setEtAgent(task.assigned_agent || '');
+    setIsEditTaskOpen(true);
+  };
+
+  const saveTaskEdit = async () => {
+    if (!etTitle.trim()) { addToast('Title required', 'err'); return; }
+    if (!editingTask) return;
+
+    const updates: Partial<Task> = {
+      title: etTitle,
+      status: etStatus,
+      priority: etPriority,
+      assigned_agent: etAgent || undefined
+    };
+
+    if (projectId === 'demo') {
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...updates } : t));
+      addToast('✓ Task updated (Demo)', 'ok');
+      setIsEditTaskOpen(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('tasks')
+        .update({ ...updates, assigned_agent: etAgent || null })
+        .eq('id', editingTask.id);
+      if (error) throw error;
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...updates } : t));
+      addToast('✓ Task updated', 'ok');
+      setIsEditTaskOpen(false);
+    } catch (error: any) {
+      addToast('Update failed: ' + error.message, 'err');
+    }
+  };
+
+  const openEditProject = () => {
+    if (!project) return;
+    setEName(project.name);
+    setEDesc(project.description);
+    setEBudget(project.budget.toString());
+    setEGoal(project.goal.toString());
+    setEStatus(project.status);
+    setETier(project.tier);
+    setIsEditProjectOpen(true);
+  };
+
+  const saveProjectEdit = async () => {
+    if (!eName.trim()) { addToast('Name required', 'err'); return; }
+
+    const updates: Partial<Project> = {
+      name: eName,
+      description: eDesc,
+      budget: parseFloat(eBudget) || 0,
+      goal: parseFloat(eGoal) || 0,
+      status: eStatus,
+      tier: eTier
+    };
+
+    if (projectId === 'demo') {
+      setProject(prev => prev ? { ...prev, ...updates } : null);
+      addToast('✓ Project saved (Demo)', 'ok');
+      setIsEditProjectOpen(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('hustles')
+        .update(updates)
+        .eq('id', projectId);
+      if (error) throw error;
+      setProject(prev => prev ? { ...prev, ...updates } : null);
+      addToast('✓ Project saved', 'ok');
+      setIsEditProjectOpen(false);
+    } catch (error: any) {
+      addToast('Save failed: ' + error.message, 'err');
+    }
+  };
+
+  const closeAddForm = () => {
+    setIsAddTaskOpen(false);
+    setNTitle('');
+    setNStatus('todo');
+    setNPriority('medium');
+    setNAgent('');
+  };
+
+  // ── COMPUTED ───────────────────────────────────────────
+  const getVisibleTasks = () => {
+    let list = filter === 'all' ? [...tasks] : tasks.filter(t => t.status === filter);
+    if (sortMode === 0) list.sort((a, b) => PRIORITY_ORDER.indexOf(a.priority || 'medium') - PRIORITY_ORDER.indexOf(b.priority || 'medium'));
+    if (sortMode === 1) list.sort((a, b) => PRIORITY_ORDER.indexOf(b.priority || 'medium') - PRIORITY_ORDER.indexOf(a.priority || 'medium'));
+    // sortMode 2 is newest (default from supabase order)
+    return list;
+  };
+
+  const totalTasks = tasks.length;
+  const doneCount = tasks.filter(t => t.status === 'done').length;
+  const openCount = totalTasks - doneCount;
+  const progressPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
+
+  const visibleTasks = getVisibleTasks();
 
   if (loading || !project) {
-    return <div style={{ padding: "40px", color: "#B8C2DA" }}>Loading…</div>;
+    return (
+      <div className="wrap"><main className="main">
+        <div className="sk sk-card" style={{ height: '200px' }}></div>
+        <div className="sk sk-card" style={{ marginTop: '20px' }}></div>
+        <div className="sk sk-card" style={{ marginTop: '10px' }}></div>
+      </main></div>
+    );
   }
-
-  const visibleTasks = filter === "all" ? tasks : tasks.filter(t => t.status === filter);
-  const doneTasks = tasks.filter(t => t.status === "done").length;
-  const progress = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
 
   return (
     <>
       <Head>
         <title>{project.name} — HustleFlow</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </Head>
-      <div style={styles.container}>
-        <header style={styles.topbar}>
-          <div style={styles.logo}>HF<span style={{color:'#3D4B6B'}}>.SITE</span></div>
-          <div style={styles.breadcrumb}>
-            <a href="/" style={styles.link}>Dashboard</a>
-            <span style={{color:'#1E2538'}}> / </span>
-            <a href="/hustles" style={styles.link}>Hustles</a>
-            <span style={{color:'#1E2538'}}> / </span>
-            <span style={{color:'#E2E8F5'}}>{project.name}</span>
-          </div>
-        </header>
 
-        <main style={styles.main}>
-          {/* Header */}
-          <div style={styles.header}>
-            <div>
-              <div style={styles.eyebrow}>{project.tier}</div>
-              <h1 style={styles.title}>{project.name}</h1>
-              <p style={styles.desc}>{project.description}</p>
+      <header className="topbar">
+        <div className="logo">HF<span>.SITE</span></div>
+        <div className="breadcrumb">
+          <a href="/">Dashboard</a>
+          <span className="sep">/</span>
+          <a href="/hustles">Hustles</a>
+          <span className="sep">/</span>
+          <span className="cur">{project.name}</span>
+        </div>
+        <div className="vault-dot"></div>
+      </header>
+
+      <div className="wrap">
+        <main className="main">
+          {/* PAGE HEADER */}
+          <div className="ph a1">
+            <div className="ph-left">
+              <div className="ph-eyebrow">
+                <span>{project.tier}</span>
+                <span className={`sbadge ${project.status}`}>{project.status}</span>
+              </div>
+              <h1 className="ph-title">{project.name}</h1>
+              <p className="ph-desc">{project.description}</p>
             </div>
-            <div style={styles.actions}>
-              <button
-                onClick={() => setEditingProject(!editingProject)}
-                style={{...styles.btn, ...styles.btnSecondary}}
-              >
-                ✏️ Edit
-              </button>
-              <button
-                onClick={() => setNewTask(!newTask)}
-                style={{...styles.btn, ...styles.btnPrimary}}
-              >
-                ＋ Task
-              </button>
+            <div className="ph-actions">
+              <button className="btn btn-secondary" onClick={openEditProject}>✏️ Edit</button>
+              <button className="btn btn-primary" onClick={() => setIsAddTaskOpen(true)}>＋ Task</button>
             </div>
           </div>
 
-          {/* Stats */}
-          <div style={styles.stats}>
-            <div style={styles.stat}>
-              <div style={styles.statLabel}>Budget</div>
-              <div style={{...styles.statVal, color:'#F0A832'}}>${project.budget}</div>
+          {/* STAT STRIP */}
+          <div className="stats a2">
+            <div className="stat">
+              <div className="stat-lbl">Budget</div>
+              <div className="stat-val amber">${project.budget.toLocaleString()}</div>
+              <div className="stat-sub">allocated</div>
             </div>
-            <div style={styles.stat}>
-              <div style={styles.statLabel}>Revenue</div>
-              <div style={{...styles.statVal, color:'#1EC9A0'}}>${project.revenue}</div>
+            <div className="stat">
+              <div className="stat-lbl">Revenue</div>
+              <div className="stat-val teal">${project.revenue.toLocaleString()}</div>
+              <div className="stat-sub">this month</div>
             </div>
-            <div style={styles.stat}>
-              <div style={styles.statLabel}>Open Tasks</div>
-              <div style={{...styles.statVal, color:'#3D7EFF'}}>{tasks.filter(t=>t.status!=='done').length}</div>
+            <div className="stat">
+              <div className="stat-lbl">Open Tasks</div>
+              <div className="stat-val accent">{openCount}</div>
+              <div className="stat-sub">of {totalTasks} total</div>
             </div>
-            <div style={styles.stat}>
-              <div style={styles.statLabel}>Goal</div>
-              <div style={styles.statVal}>${project.goal}</div>
-            </div>
-          </div>
-
-          {/* Progress */}
-          <div style={styles.progressCard}>
-            <div style={styles.progHead}>
-              <div style={styles.progLabel}>Task Completion</div>
-              <div style={styles.progPct}>{progress}%</div>
-            </div>
-            <div style={styles.progTrack}>
-              <div style={{...styles.progFill, width:`${progress}%`}}></div>
-            </div>
-            <div style={styles.progLabels}>
-              <span>{doneTasks} done</span>
-              <span>{tasks.filter(t=>t.status!=='done').length} remaining</span>
+            <div className="stat">
+              <div className="stat-lbl">Goal</div>
+              <div className="stat-val">${project.goal.toLocaleString()}</div>
+              <div className="stat-sub">target</div>
             </div>
           </div>
 
-          {/* Tasks */}
-          <div style={styles.grid}>
-            <div>
-              <div style={styles.sectionHead}>
-                Tasks <span style={styles.count}>{tasks.length}</span>
+          {/* PROGRESS BAR */}
+          <div className="progress-card a3">
+            <div className="prog-head">
+              <div className="prog-label">Task Completion</div>
+              <div className="prog-pct">{progressPct}%</div>
+            </div>
+            <div className="prog-track">
+              <div className="prog-fill" style={{ width: `${progressPct}%` }}></div>
+            </div>
+            <div className="prog-labels">
+              <span>{doneCount} done</span>
+              <span>{openCount} remaining</span>
+            </div>
+          </div>
+
+          {/* GRID */}
+          <div className="grid">
+            {/* LEFT: TASKS */}
+            <div className="a4">
+              <div className="sec-head">
+                <div className="sec-title">Tasks <span className="sec-count">{totalTasks}</span></div>
+                <div className="sec-actions">
+                  <button className="btn btn-ghost btn-sm" onClick={() => setSortMode((sortMode + 1) % 3)}>
+                    ⇅ {sortMode === 0 ? 'Priority ↓' : sortMode === 1 ? 'Priority ↑' : 'Newest'}
+                  </button>
+                </div>
               </div>
 
-              {/* Filter tabs */}
-              <div style={styles.filterTabs}>
-                {["all", "todo", "progress", "review", "done", "blocked"].map(f => (
+              {/* FILTER TABS */}
+              <div className="filter-tabs">
+                {['all', 'todo', 'progress', 'review', 'done', 'blocked'].map(f => (
                   <button
                     key={f}
+                    className={`ftab ${filter === f ? 'active' : ''}`}
                     onClick={() => setFilter(f)}
-                    style={{
-                      ...styles.filterTab,
-                      ...(filter === f ? styles.filterTabActive : {}),
-                    }}
                   >
                     {f.charAt(0).toUpperCase() + f.slice(1)}
                   </button>
                 ))}
               </div>
 
-              {/* Task list */}
-              <div style={styles.taskList}>
-                {visibleTasks.map(task => {
-                  const agent = AGENTS.find(a => a.name === task.assigned_agent);
-                  return (
-                    <div key={task.id} style={{...styles.task, ...(task.status === 'done' ? {opacity: 0.5} : {})}}>
-                      <input
-                        type="checkbox"
-                        checked={task.status === "done"}
-                        onChange={() => updateTask(task.id, { status: task.status === "done" ? "todo" : "done" })}
-                        style={styles.checkbox}
-                      />
-                      <div style={styles.taskBody}>
-                        <div style={{...styles.taskTitle, ...(task.status === 'done' ? {textDecoration:'line-through', color:'#3D4B6B'} : {})}}>{task.title}</div>
-                        <div style={styles.taskMeta}>
-                          <span style={{...styles.badge, ...styles[`badge${task.status}`]}}>{task.status}</span>
-                          {agent && (
-                            <span style={{...styles.agent, background: agent.bg, color: agent.color}}>
-                              {agent.name[0]} {agent.name}
-                            </span>
-                          )}
+              {/* TASK LIST */}
+              <div className="task-list">
+                {visibleTasks.length === 0 ? (
+                  <div className="empty">
+                    <div className="empty-ico">{filter === 'done' ? '🎉' : '📋'}</div>
+                    <div className="empty-txt">{filter === 'all' ? 'No tasks yet — add one below' : `No ${filter} tasks`}</div>
+                  </div>
+                ) : (
+                  visibleTasks.map((t, i) => {
+                    const agent = AGENTS.find(a => a.name === t.assigned_agent);
+                    return (
+                      <div key={t.id} className={`task p-${t.priority || 'medium'} ${t.status === 'done' ? 'done' : ''}`} style={{ animationDelay: `${i * 0.04}s` }}>
+                        <button className="check" onClick={() => toggleDone(t)}>
+                          {t.status === 'done' && '✓'}
+                        </button>
+                        <div className="task-body">
+                          <div className="task-title">{t.title}</div>
+                          <div className="task-meta">
+                            <span className={`sbadge ${t.status}`}>{STATUS_LABEL[t.status] || t.status}</span>
+                            <span className={`pdot ${t.priority || 'medium'}`}></span>
+                            <div className="agent-wrap">
+                              <span
+                                className={`agent-chip ${agent ? 'assigned' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === t.id ? null : t.id); }}
+                              >
+                                <span className="av" style={{ background: agent ? agent.bg : 'var(--surface2)', color: agent ? agent.color : 'var(--muted)' }}>
+                                  {agent ? agent.name[0] : '?'}
+                                </span>
+                                {agent ? agent.name : 'Assign…'}
+                              </span>
+
+                              <div className={`agent-drop ${openDropdown === t.id ? 'open' : ''}`} onClick={e => e.stopPropagation()}>
+                                <div className={`adrop-item ${!t.assigned_agent ? 'sel' : ''}`} onClick={() => assignAgent(t.id, '')}>
+                                  <div className="adrop-av" style={{ background: 'var(--surface2)', color: 'var(--muted)' }}>—</div>
+                                  <div className="adrop-info"><div className="name">Unassigned</div><div className="role">No agent</div></div>
+                                </div>
+                                {AGENTS.map(a => (
+                                  <div key={a.name} className={`adrop-item ${t.assigned_agent === a.name ? 'sel' : ''}`} onClick={() => assignAgent(t.id, a.name)}>
+                                    <div className="adrop-av" style={{ background: a.bg, color: a.color }}>{a.name[0]}</div>
+                                    <div className="adrop-info">
+                                      <div className="name">{a.name}</div>
+                                      <div className="role">{a.role} · {a.tier}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="task-btns">
+                          <button className="tBtn edit" onClick={() => openEditTask(t)}>✏️</button>
+                          <button className="tBtn del" onClick={() => handleDeleteTask(t.id)}>🗑</button>
                         </div>
                       </div>
-                      <div style={styles.taskActions}>
-                        <button onClick={() => setEditingTask(task.id)} style={styles.actionBtn}>✏️</button>
-                        <button onClick={() => deleteTask(task.id)} style={styles.actionBtn}>🗑</button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
-              {/* Add task form */}
-              {newTask && (
-                <AddTaskForm onAdd={addTask} onCancel={() => setNewTask(false)} />
+              {/* ADD TASK TRIGGER */}
+              {!isAddTaskOpen && (
+                <div className="add-trigger" onClick={() => setIsAddTaskOpen(true)}>
+                  <span style={{ fontSize: '16px' }}>＋</span> Add a task…
+                </div>
+              )}
+
+              {/* INLINE ADD TASK FORM */}
+              {isAddTaskOpen && (
+                <div className="add-form open">
+                  <div className="fg">
+                    <label className="flabel">Task Title *</label>
+                    <input className="finput" value={nTitle} onChange={e => setNTitle(e.target.value)} placeholder="What needs to get done?" autoFocus />
+                  </div>
+                  <div className="frow">
+                    <div className="fg">
+                      <label className="flabel">Status</label>
+                      <select className="fselect" value={nStatus} onChange={e => setNStatus(e.target.value as any)}>
+                        <option value="todo">Todo</option>
+                        <option value="progress">In Progress</option>
+                        <option value="review">Review</option>
+                        <option value="blocked">Blocked</option>
+                      </select>
+                    </div>
+                    <div className="fg">
+                      <label className="flabel">Priority</label>
+                      <select className="fselect" value={nPriority} onChange={e => setNPriority(e.target.value as any)}>
+                        <option value="medium">Medium</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="fg">
+                    <label className="flabel">Assign Agent</label>
+                    <select className="fselect" value={nAgent} onChange={e => setNAgent(e.target.value)}>
+                      <option value="">— Unassigned —</option>
+                      {AGENTS.map(a => <option key={a.name} value={a.name}>● {a.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="factions">
+                    <button className="btn btn-ghost btn-sm" onClick={closeAddForm}>Cancel</button>
+                    <button className="btn btn-primary btn-sm" onClick={handleAddTask}>＋ Add Task</button>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Sidebar */}
-            <div>
-              <div style={styles.card}>
-                <div style={styles.cardTitle}>Project Info</div>
-                <div style={styles.infoRow}>
-                  <span>Tier</span>
-                  <span style={styles.infoVal}>{project.tier}</span>
+            {/* RIGHT SIDEBAR */}
+            <div className="a5">
+              <div className="card">
+                <div className="card-title">Project Info</div>
+                <div className="irow"><div className="ikey">Tier</div><div className="ival">{project.tier}</div></div>
+                <div className="irow"><div className="ikey">Status</div><div className="ival teal">{project.status}</div></div>
+                <div className="irow"><div className="ikey">Budget</div><div className="ival amber">${project.budget.toLocaleString()}</div></div>
+                <div className="irow"><div className="ikey">Revenue</div><div className="ival teal">${project.revenue.toLocaleString()}</div></div>
+                <div className="irow"><div className="ikey">Goal</div><div className="ival">${project.goal.toLocaleString()}</div></div>
+                <div className="irow">
+                  <div className="ikey">Created</div>
+                  <div className="ival">
+                    {project.created_at ? new Date(project.created_at).toLocaleDateString() : '-'}
+                  </div>
                 </div>
-                <div style={styles.infoRow}>
-                  <span>Status</span>
-                  <span style={{...styles.infoVal, color:'#1EC9A0'}}>{project.status}</span>
+                <div style={{ marginTop: '12px' }}>
+                  <button className="btn btn-secondary" style={{ width: '100%' }} onClick={openEditProject}>✏️ Edit Project</button>
                 </div>
-                <div style={styles.infoRow}>
-                  <span>Budget</span>
-                  <span style={{...styles.infoVal, color:'#F0A832'}}>${project.budget}</span>
-                </div>
-                <button
-                  onClick={() => setEditingProject(!editingProject)}
-                  style={{...styles.btn, ...styles.btnSecondary, width:'100%', marginTop:'12px'}}
-                >
-                  ✏️ Edit
-                </button>
               </div>
 
-              <div style={styles.card}>
-                <div style={styles.cardTitle}>Assigned Agents</div>
-                {AGENTS.map(a => {
-                  const count = tasks.filter(t => t.assigned_agent === a.name && t.status !== 'done').length;
-                  return (
-                    <div key={a.name} style={{...styles.agentRow, background: a.bg, color: a.color, padding: '8px', borderRadius: '8px', marginBottom: '4px'}}>
-                      <strong>{a.name}</strong>
-                      <span style={{marginLeft:'auto'}}>{count > 0 ? `${count} active` : 'idle'}</span>
-                    </div>
-                  );
-                })}
+              <div className="card">
+                <div className="card-title">Agents</div>
+                <div className="agent-list">
+                  {AGENTS.map(a => {
+                    const count = tasks.filter(t => t.assigned_agent === a.name && t.status !== 'done').length;
+                    return (
+                      <div key={a.name} className="agent-row">
+                        <div className="av-lg" style={{ background: a.bg, color: a.color }}>{a.name[0]}</div>
+                        <div className="agent-row-info">
+                          <div className="agent-row-name">{a.name}</div>
+                          <div className="agent-row-role">{a.role} · {a.tier}</div>
+                        </div>
+                        <div className="agent-row-count">{count > 0 ? `${count} active` : 'idle'}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
         </main>
-
-        {/* Edit Project Modal */}
-        {editingProject && (
-          <EditProjectModal project={project} onSave={updateProject} onClose={() => setEditingProject(false)} />
-        )}
-
-        {/* Edit Task Modal */}
-        {editingTask && (
-          <EditTaskModal
-            task={tasks.find(t => t.id === editingTask)!}
-            onSave={(updates) => updateTask(editingTask, updates)}
-            onClose={() => setEditingTask(null)}
-          />
-        )}
       </div>
+
+      {/* EDIT PROJECT MODAL */}
+      <div className={`overlay ${isEditProjectOpen ? 'open' : ''}`} onClick={() => setIsEditProjectOpen(false)}>
+        <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="mhead">
+            <div className="mtitle">✏️ EDIT PROJECT</div>
+            <button className="mclose" onClick={() => setIsEditProjectOpen(false)}>✕</button>
+          </div>
+          <div className="mbody">
+            <div className="fg">
+              <label className="flabel">Project Name *</label>
+              <input className="finput" value={eName} onChange={e => setEName(e.target.value)} />
+            </div>
+            <div className="fg">
+              <label className="flabel">Description</label>
+              <textarea className="ftextarea" value={eDesc} onChange={e => setEDesc(e.target.value)}></textarea>
+            </div>
+            <div className="frow">
+              <div className="fg"><label className="flabel">Budget ($)</label><input className="finput" type="number" value={eBudget} onChange={e => setEBudget(e.target.value)} /></div>
+              <div className="fg"><label className="flabel">Goal ($)</label><input className="finput" type="number" value={eGoal} onChange={e => setEGoal(e.target.value)} /></div>
+            </div>
+            <div className="frow">
+              <div className="fg">
+                <label className="flabel">Status</label>
+                <select className="fselect" value={eStatus} onChange={e => setEStatus(e.target.value as any)}>
+                  <option value="active">Active</option>
+                  <option value="passive">Passive</option>
+                  <option value="paused">Paused</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+              <div className="fg">
+                <label className="flabel">Tier</label>
+                <select className="fselect" value={eTier} onChange={e => setETier(e.target.value)}>
+                  <option value="P1 · Primary Engine">P1 · Primary Engine</option>
+                  <option value="R2 · Revenue Engine">R2 · Revenue Engine</option>
+                  <option value="P3 · Pipeline">P3 · Pipeline</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="mfoot">
+            <button className="btn btn-ghost" onClick={() => setIsEditProjectOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveProjectEdit}>💾 Save</button>
+          </div>
+        </div>
+      </div>
+
+      {/* EDIT TASK MODAL */}
+      <div className={`overlay ${isEditTaskOpen ? 'open' : ''}`} onClick={() => setIsEditTaskOpen(false)}>
+        <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="mhead">
+            <div className="mtitle">✏️ EDIT TASK</div>
+            <button className="mclose" onClick={() => setIsEditTaskOpen(false)}>✕</button>
+          </div>
+          <div className="mbody">
+            <div className="fg">
+              <label className="flabel">Task Title *</label>
+              <input className="finput" value={etTitle} onChange={e => setEtTitle(e.target.value)} />
+            </div>
+            <div className="frow">
+              <div className="fg">
+                <label className="flabel">Status</label>
+                <select className="fselect" value={etStatus} onChange={e => setEtStatus(e.target.value as any)}>
+                  <option value="todo">Todo</option>
+                  <option value="progress">In Progress</option>
+                  <option value="review">Review</option>
+                  <option value="done">Done</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </div>
+              <div className="fg">
+                <label className="flabel">Priority</label>
+                <select className="fselect" value={etPriority} onChange={e => setEtPriority(e.target.value as any)}>
+                  <option value="urgent">Urgent</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+            <div className="fg">
+              <label className="flabel">Assigned Agent</label>
+              <select className="fselect" value={etAgent} onChange={e => setEtAgent(e.target.value)}>
+                <option value="">— Unassigned —</option>
+                {AGENTS.map(a => <option key={a.name} value={a.name}>● {a.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="mfoot">
+            <button className="btn btn-ghost" onClick={() => setIsEditTaskOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveTaskEdit}>💾 Save Task</button>
+          </div>
+        </div>
+      </div>
+
+      {/* TOASTS */}
+      <div className="toasts">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast ${t.type}`}>
+            <span className="toast-icon">{t.type === 'ok' ? '✓' : '⚠'}</span>
+            {t.msg}
+          </div>
+        ))}
+      </div>
+
+      <style jsx global>{`
+        /* Next.js specific tweaks if any */
+      `}</style>
     </>
   );
 }
 
-function AddTaskForm({ onAdd, onCancel }: { onAdd: (title: string, status: string, priority: string, agent: string) => void; onCancel: () => void }) {
-  const [title, setTitle] = useState("");
-  const [status, setStatus] = useState("todo");
-  const [priority, setPriority] = useState("medium");
-  const [agent, setAgent] = useState("");
-
-  return (
-    <div style={styles.formContainer}>
-      <input placeholder="Task title..." value={title} onChange={e => setTitle(e.target.value)} style={styles.input} />
-      <select value={status} onChange={e => setStatus(e.target.value)} style={styles.select}>
-        <option value="todo">Todo</option>
-        <option value="progress">In Progress</option>
-      </select>
-      <select value={agent} onChange={e => setAgent(e.target.value)} style={styles.select}>
-        <option value="">— Unassigned —</option>
-        {AGENTS.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
-      </select>
-      <div style={{display:'flex', gap:'8px'}}>
-        <button onClick={() => onAdd(title, status, priority, agent)} style={{...styles.btn, ...styles.btnPrimary, flex:1}}>Add</button>
-        <button onClick={onCancel} style={{...styles.btn, ...styles.btnSecondary, flex:1}}>Cancel</button>
-      </div>
-    </div>
-  );
-}
-
-function EditProjectModal({ project, onSave, onClose }: { project: Project; onSave: (updates: Partial<Project>) => void; onClose: () => void }) {
-  const [name, setName] = useState(project.name);
-  const [description, setDescription] = useState(project.description);
-  const [budget, setBudget] = useState(project.budget.toString());
-  const [goal, setGoal] = useState(project.goal.toString());
-
-  return (
-    <div style={styles.modal} onClick={onClose}>
-      <div style={{...styles.modalContent, minWidth:'500px'}} onClick={e => e.stopPropagation()}>
-        <h2 style={styles.modalTitle}>Edit Project</h2>
-        <input placeholder="Name" value={name} onChange={e => setName(e.target.value)} style={styles.input} />
-        <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} style={{...styles.input, minHeight:'80px'}} />
-        <input type="number" placeholder="Budget" value={budget} onChange={e => setBudget(e.target.value)} style={styles.input} />
-        <input type="number" placeholder="Goal" value={goal} onChange={e => setGoal(e.target.value)} style={styles.input} />
-        <div style={{display:'flex', gap:'8px'}}>
-          <button onClick={() => onSave({name, description, budget: parseFloat(budget), goal: parseFloat(goal)})} style={{...styles.btn, ...styles.btnPrimary, flex:1}}>Save</button>
-          <button onClick={onClose} style={{...styles.btn, ...styles.btnSecondary, flex:1}}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EditTaskModal({ task, onSave, onClose }: { task: Task; onSave: (updates: Partial<Task>) => void; onClose: () => void }) {
-  const [title, setTitle] = useState(task.title);
-  const [status, setStatus] = useState(task.status);
-  const [agent, setAgent] = useState(task.assigned_agent || "");
-
-  return (
-    <div style={styles.modal} onClick={onClose}>
-      <div style={{...styles.modalContent, minWidth:'500px'}} onClick={e => e.stopPropagation()}>
-        <h2 style={styles.modalTitle}>Edit Task</h2>
-        <input value={title} onChange={e => setTitle(e.target.value)} style={styles.input} />
-        <select value={status} onChange={e => setStatus(e.target.value as any)} style={styles.select}>
-          <option value="todo">Todo</option>
-          <option value="progress">In Progress</option>
-          <option value="review">Review</option>
-          <option value="done">Done</option>
-        </select>
-        <select value={agent} onChange={e => setAgent(e.target.value)} style={styles.select}>
-          <option value="">— Unassigned —</option>
-          {AGENTS.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
-        </select>
-        <div style={{display:'flex', gap:'8px'}}>
-          <button onClick={() => onSave({title, status: status as any, assigned_agent: agent})} style={{...styles.btn, ...styles.btnPrimary, flex:1}}>Save</button>
-          <button onClick={onClose} style={{...styles.btn, ...styles.btnSecondary, flex:1}}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const styles: any = {
-  container: { background: "#080B12", color: "#B8C2DA", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" },
-  topbar: { position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, height: "56px", background: "rgba(8,11,18,.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid #1E2538", display: "flex", alignItems: "center", gap: "10px", padding: "0 16px" },
-  logo: { fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: "13px", color: "#3D7EFF" },
-  breadcrumb: { display: "flex", alignItems: "center", gap: "6px", flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", overflow: "hidden" },
-  link: { color: "#6B7A9F", textDecoration: "none", cursor: "pointer" },
-  main: { paddingTop: "56px", maxWidth: "1200px", margin: "0 auto", padding: "80px 20px 40px" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "14px", marginBottom: "22px" },
-  eyebrow: { fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#3D4B6B", textTransform: "uppercase", marginBottom: "6px" },
-  title: { fontSize: "30px", fontWeight: 700, color: "#E2E8F5", marginBottom: "6px" },
-  desc: { fontSize: "13px", color: "#6B7A9F", maxWidth: "500px" },
-  actions: { display: "flex", gap: "8px" },
-  btn: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "0 14px", height: "36px", borderRadius: "8px", fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", fontWeight: 600, cursor: "pointer", border: "none", transition: "all .15s" },
-  btnPrimary: { background: "#3D7EFF", color: "#fff" },
-  btnSecondary: { background: "#141826", color: "#B8C2DA", border: "1px solid #1E2538" },
-  stats: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "20px" },
-  stat: { background: "#0E1220", border: "1px solid #1E2538", borderRadius: "8px", padding: "14px", textAlign: "center" },
-  statLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#3D4B6B", textTransform: "uppercase", marginBottom: "6px" },
-  statVal: { fontFamily: "'JetBrains Mono', monospace", fontSize: "22px", fontWeight: 700, color: "#E2E8F5" },
-  progressCard: { background: "#0E1220", border: "1px solid #1E2538", borderRadius: "12px", padding: "18px", marginBottom: "22px" },
-  progHead: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "10px" },
-  progLabel: { fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", color: "#3D4B6B", textTransform: "uppercase" },
-  progPct: { fontFamily: "'JetBrains Mono', monospace", fontSize: "20px", fontWeight: 700, color: "#E2E8F5" },
-  progTrack: { height: "6px", background: "#141826", borderRadius: "3px", overflow: "hidden", marginBottom: "8px" },
-  progFill: { height: "100%", borderRadius: "3px", background: "linear-gradient(90deg,#1EC9A0,#3D7EFF)", transition: "width .8s" },
-  progLabels: { display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", color: "#3D4B6B" },
-  grid: { display: "grid", gridTemplateColumns: "1fr 280px", gap: "20px" },
-  sectionHead: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", fontWeight: 700, color: "#3D4B6B", textTransform: "uppercase" },
-  count: { fontSize: "9px", padding: "1px 6px", borderRadius: "4px", background: "#141826", border: "1px solid #1E2538", color: "#3D4B6B" },
-  filterTabs: { display: "flex", gap: "3px", marginBottom: "10px", background: "#141826", borderRadius: "8px", padding: "3px", border: "1px solid #1E2538", overflowX: "auto" as any },
-  filterTab: { fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", padding: "5px 11px", borderRadius: "5px", cursor: "pointer", color: "#3D4B6B", border: "none", background: "transparent", transition: "all .15s" },
-  filterTabActive: { background: "#0E1220", color: "#E2E8F5", boxShadow: "0 1px 4px rgba(0,0,0,.3)" },
-  taskList: { display: "flex", flexDirection: "column" as any, gap: "5px", marginBottom: "10px" },
-  task: { background: "#0E1220", border: "1px solid #1E2538", borderRadius: "8px", padding: "11px 12px", display: "flex", alignItems: "center", gap: "9px", transition: "all .15s", borderLeft: "3px solid #3D4B6B" },
-  checkbox: { width: "18px", height: "18px", cursor: "pointer", accentColor: "#1EC9A0" },
-  taskBody: { flex: 1, minWidth: 0 },
-  taskTitle: { fontSize: "13px", fontWeight: 500, color: "#E2E8F5", marginBottom: "4px" },
-  taskMeta: { display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" as any },
-  badge: { fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", padding: "2px 7px", borderRadius: "4px", border: "1px solid" },
-  badgetodo: { color: "#6B7A9F", borderColor: "#252D42", background: "#141826" },
-  badgeprogress: { color: "#F0A832", borderColor: "rgba(240,168,50,.3)", background: "rgba(240,168,50,.08)" },
-  badgedone: { color: "#1EC9A0", borderColor: "rgba(30,201,160,.3)", background: "rgba(30,201,160,.08)" },
-  agent: { fontFamily: "'JetBrains Mono', monospace", fontSize: "9px", padding: "2px 7px", borderRadius: "4px" },
-  taskActions: { display: "flex", gap: "3px" },
-  actionBtn: { width: "26px", height: "26px", borderRadius: "5px", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "#3D4B6B", fontSize: "11px", transition: "all .12s" },
-  card: { background: "#0E1220", border: "1px solid #1E2538", borderRadius: "12px", padding: "16px", marginBottom: "12px" },
-  cardTitle: { fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", color: "#3D4B6B", textTransform: "uppercase", marginBottom: "12px" },
-  infoRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #1E2538", fontSize: "10px" },
-  infoVal: { fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", color: "#E2E8F5", fontWeight: 600 },
-  agentRow: { padding: "8px", borderRadius: "8px", marginBottom: "4px", fontSize: "12px", display: "flex", justifyContent: "space-between" },
-  input: { width: "100%", padding: "9px 12px", marginBottom: "10px", background: "#141826", border: "1px solid #252D42", borderRadius: "8px", color: "#E2E8F5", fontFamily: "'DM Sans', sans-serif", fontSize: "13px" },
-  select: { width: "100%", padding: "9px 12px", marginBottom: "10px", background: "#141826", border: "1px solid #252D42", borderRadius: "8px", color: "#E2E8F5", fontFamily: "'DM Sans', sans-serif", fontSize: "13px" },
-  formContainer: { background: "#0E1220", border: "1px solid #1E2538", borderRadius: "8px", padding: "14px", marginTop: "6px" },
-  modal: { position: "fixed" as any, inset: 0, zIndex: 200, background: "rgba(0,0,0,.72)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" },
-  modalContent: { background: "#0E1220", border: "1px solid #252D42", borderRadius: "12px", padding: "20px", boxShadow: "0 24px 80px rgba(0,0,0,.6)" },
-  modalTitle: { fontFamily: "'JetBrains Mono', monospace", fontSize: "13px", fontWeight: 700, color: "#E2E8F5", marginBottom: "20px" },
-};
+ProjectDashboard.getLayout = (page: React.ReactElement) => page;
