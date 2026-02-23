@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 
 interface TopbarProps {
@@ -11,20 +12,20 @@ export default function Topbar({ onMenuClick, onCommandClick }: TopbarProps) {
   useEffect(() => {
     const updateTime = () => {
       const now = new Date()
-      const d = now.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+      const d = now.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       }).toUpperCase()
-      const t = now.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: false 
+      const t = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
       })
       setTime(`${d} · ${t}`)
     }
-    
+
     updateTime()
     const interval = setInterval(updateTime, 30000)
     return () => clearInterval(interval)
@@ -55,11 +56,13 @@ export default function Topbar({ onMenuClick, onCommandClick }: TopbarProps) {
       </button>
 
       {/* Logo */}
-      <img 
-        src="/logo.png" 
-        alt="Hustle Flow" 
-        className="h-10 md:h-12 flex-shrink-0 hidden sm:block"
-      />
+      <Link href="/" className="flex-shrink-0 hidden sm:block">
+        <img
+          src="/logo.png"
+          alt="Hustle Flow"
+          className="h-10 md:h-12 hover:opacity-80 transition"
+        />
+      </Link>
 
       {/* Search / Command */}
       <button onClick={onCommandClick} className="hidden sm:flex flex-1 max-w-sm items-center gap-2 bg-hf-surface border border-hf-border rounded-xs px-3 h-9 cursor-pointer hover:border-hf-border2 transition">

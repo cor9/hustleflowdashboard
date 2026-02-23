@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import SectionHeader from '../components/SectionHeader'
 import { supabase } from '../lib/supabase'
 
@@ -8,114 +9,47 @@ interface Hustle {
   id: string
   name: string
   description: string
-  status: 'active' | 'paused' | 'completed'
-  revenue_target: number
-  current_revenue: number
-  owner: string
+  status: string
+  goal: number
+  budget: number
+  tier: string
+  color: string
 }
 
-const mockHustles: Hustle[] = [
-  {
-    id: '1',
-    name: 'CA101 — Child Actor 101',
-    description: 'Brand + audience ecosystem: blog, social, classes, workshops',
-    status: 'active',
-    revenue_target: 50000,
-    current_revenue: 12000,
-    owner: 'Corey',
-  },
-  {
-    id: '2',
-    name: 'Bohemia — Youth Talent Management',
-    description: 'Roster of 25+ actors, coaching, bookings, networking',
-    status: 'active',
-    revenue_target: 25000,
-    current_revenue: 8500,
-    owner: 'Corey',
-  },
-  {
-    id: '3',
-    name: 'PREP101 — SaaS Training Platform',
-    description: 'Monthly subscription service for actor prep & audition coaching',
-    status: 'active',
-    revenue_target: 15000,
-    current_revenue: 312,
-    owner: 'Corey',
-  },
-  {
-    id: '4',
-    name: 'Coaching — 1:1 & Group Sessions',
-    description: 'Personalized coaching, workshops, masterclasses',
-    status: 'active',
-    revenue_target: 12000,
-    current_revenue: 4200,
-    owner: 'Corey',
-  },
-  {
-    id: '5',
-    name: 'Directory — Vendor Listings',
-    description: 'Casting agencies, coaches, photographers, workshops marketplace',
-    status: 'active',
-    revenue_target: 8000,
-    current_revenue: 2100,
-    owner: 'Corey',
-  },
-  {
-    id: '6',
-    name: 'Amazon — Affiliate & Influencer',
-    description: 'Books, gear, courses affiliate revenue + Amazon Influencer program',
-    status: 'active',
-    revenue_target: 6000,
-    current_revenue: 450,
-    owner: 'Corey',
-  },
-  {
-    id: '7',
-    name: 'Books / KDP — Self-Publishing',
-    description: 'Kindle Direct Publishing: actor guides, workbooks, scripts',
-    status: 'active',
-    revenue_target: 5000,
-    current_revenue: 890,
-    owner: 'Corey',
-  },
-  {
-    id: '8',
-    name: 'WearablePSA / Merch — Print-on-Demand',
-    description: 'Branded merchandise, apparel, sublimation products',
-    status: 'paused',
-    revenue_target: 10000,
-    current_revenue: 2300,
-    owner: 'Corey',
-  },
-]
-
-function HustleBar({ name, target, current }: { name: string; target: number; current: number }) {
-  const percent = Math.round((current / target) * 100)
+function HustleBar({ id, name, goal, budget, color }: { id: string; name: string; goal: number; budget: number; color?: string }) {
+  const percent = goal > 0 ? Math.round((budget / goal) * 100) : 0
   return (
-    <div className="mb-4 animate-fadeUp">
+    <Link href={`/hustles/${id}`} className="block group mb-4 transition-transform hover:-translate-y-0.5">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-hf-head">{name}</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-hf-head group-hover:text-hf-accent transition-colors">{name}</h3>
+          <p className="text-[10px] font-mono text-hf-muted uppercase tracking-widest mt-0.5">System ID: {id.slice(0, 8)}</p>
+        </div>
         <div className="text-right">
           <div className="font-mono text-sm font-bold text-hf-teal">
-            ${current.toLocaleString()}
+            ${budget?.toLocaleString() || '0'}
           </div>
-          <div className="font-mono text-xs text-hf-muted">
-            {percent}% of ${target.toLocaleString()} goal
+          <div className="font-mono text-[10px] text-hf-muted uppercase">
+            {percent}% of ${goal?.toLocaleString() || '0'} TARGET
           </div>
         </div>
       </div>
-      <div className="w-full bg-hf-surface2 rounded-sm h-2 overflow-hidden">
+      <div className="w-full bg-hf-surface2 border border-hf-border/30 rounded-xs h-1.5 overflow-hidden">
         <div
-          className="h-full rounded-sm bg-gradient-to-r from-hf-teal to-hf-accent transition-all duration-600"
-          style={{ width: `${Math.min(percent, 100)}%` }}
+          className="h-full rounded-xs transition-all duration-1000 ease-out"
+          style={{
+            width: `${Math.min(percent, 100)}%`,
+            backgroundColor: color || '#1EC9A0',
+            boxShadow: `0 0 10px ${color || '#1EC9A0'}44`
+          }}
         />
       </div>
-    </div>
+    </Link>
   )
 }
 
 export default function HustlesPage() {
-  const [hustles, setHustles] = useState<Hustle[]>(mockHustles)
+  const [hustles, setHustles] = useState<Hustle[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -123,9 +57,10 @@ export default function HustlesPage() {
   }, [])
 
   const loadHustles = async () => {
+    if (!supabase) return
     try {
-      const { data } = await supabase.from('hustles').select('*')
-      if (data && data.length > 0) {
+      const { data } = await supabase.from('hustles').select('*').order('sort_order', { ascending: true })
+      if (data) {
         setHustles(data as Hustle[])
       }
     } catch (err) {
@@ -136,79 +71,83 @@ export default function HustlesPage() {
   }
 
   const activeHustles = hustles.filter((h) => h.status === 'active')
-  const pausedHustles = hustles.filter((h) => h.status === 'paused')
-  const totalRevenue = hustles.reduce((sum, h) => sum + h.current_revenue, 0)
-  const totalTarget = hustles.reduce((sum, h) => sum + h.revenue_target, 0)
+  const otherHustles = hustles.filter((h) => h.status !== 'active')
+  const totalBudget = hustles.reduce((sum, h) => sum + (h.budget || 0), 0)
+  const totalGoal = hustles.reduce((sum, h) => sum + (h.goal || 0), 0)
 
   return (
     <div className="max-w-4xl">
-      <SectionHeader title="Hustles" action={{ label: 'New hustle' }} />
+      <SectionHeader title="Hustle Registry" action={{ label: 'New Prototype', href: '/' }} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
-        <div className="bg-hf-surface border border-hf-border rounded-xs p-4">
-          <div className="font-mono text-xs text-hf-muted uppercase tracking-wider mb-2">
-            Total Revenue
+        <div className="bg-hf-surface border border-hf-border rounded-xs p-4 shadow-lg">
+          <div className="font-mono text-[10px] text-hf-muted uppercase tracking-widest mb-1">
+            Total Deployed
           </div>
           <div className="font-mono text-3xl font-bold text-hf-teal">
-            ${totalRevenue.toLocaleString()}
+            ${totalBudget.toLocaleString()}
           </div>
-          <div className="text-xs text-hf-sub mt-2">
-            Across {hustles.length} projects
+          <div className="text-[10px] font-mono text-hf-sub mt-2 uppercase">
+            Across {hustles.length} engines
           </div>
         </div>
 
-        <div className="bg-hf-surface border border-hf-border rounded-xs p-4">
-          <div className="font-mono text-xs text-hf-muted uppercase tracking-wider mb-2">
-            Goal
+        <div className="bg-hf-surface border border-hf-border rounded-xs p-4 shadow-lg">
+          <div className="font-mono text-[10px] text-hf-muted uppercase tracking-widest mb-1">
+            Revenue Target
           </div>
           <div className="font-mono text-3xl font-bold text-hf-amber">
-            ${totalTarget.toLocaleString()}
+            ${totalGoal.toLocaleString()}
           </div>
-          <div className="text-xs text-hf-sub mt-2">
-            Combined annual target
+          <div className="text-[10px] font-mono text-hf-sub mt-2 uppercase">
+            Combined ecosystem goal
           </div>
         </div>
 
-        <div className="bg-hf-surface border border-hf-border rounded-xs p-4">
-          <div className="font-mono text-xs text-hf-muted uppercase tracking-wider mb-2">
-            Progress
+        <div className="bg-hf-surface border border-hf-border rounded-xs p-4 shadow-lg">
+          <div className="font-mono text-[10px] text-hf-muted uppercase tracking-widest mb-1">
+            Utilization
           </div>
           <div className="font-mono text-3xl font-bold text-hf-accent">
-            {Math.round((totalRevenue / totalTarget) * 100)}%
+            {totalGoal > 0 ? Math.round((totalBudget / totalGoal) * 100) : 0}%
           </div>
-          <div className="text-xs text-hf-sub mt-2">
-            of annual goal
+          <div className="text-[10px] font-mono text-hf-sub mt-2 uppercase">
+            Resource efficiency
           </div>
         </div>
       </div>
 
       {/* Active Hustles */}
-      <SectionHeader title="Active Projects" />
-      <div className="bg-hf-surface border border-hf-border rounded-xs p-4 mb-8">
-        {activeHustles.map((hustle, idx) => (
+      <SectionHeader title="Active Engines" />
+      <div className="bg-hf-surface border border-hf-border rounded-xs p-5 mb-8 shadow-inner">
+        {activeHustles.length > 0 ? activeHustles.map((hustle, idx) => (
           <div
             key={hustle.id}
             style={{ animationDelay: `${0.1 + idx * 0.05}s` }}
             className="animate-fadeUp"
           >
-            <HustleBar name={hustle.name} target={hustle.revenue_target} current={hustle.current_revenue} />
+            <HustleBar id={hustle.id} name={hustle.name} goal={hustle.goal} budget={hustle.budget} color={hustle.color} />
           </div>
-        ))}
+        )) : (
+          <div className="py-12 text-center text-hf-muted font-mono text-xs uppercase tracking-[0.2em]">
+            No active engines found
+          </div>
+        )}
       </div>
 
-      {/* Paused Hustles */}
-      {pausedHustles.length > 0 && (
+      {/* Non-Active Hustles */}
+      {otherHustles.length > 0 && (
         <>
-          <SectionHeader title="Paused / Archived" />
-          <div className="bg-hf-surface/50 border border-hf-border rounded-xs p-4">
-            {pausedHustles.map((hustle, idx) => (
+          <SectionHeader title="Archived / Pipeline" />
+          <div className="bg-hf-surface/30 border border-hf-border/50 rounded-xs p-5">
+            {otherHustles.map((hustle, idx) => (
               <div
                 key={hustle.id}
                 style={{ animationDelay: `${0.1 + idx * 0.05}s` }}
-                className="animate-fadeUp opacity-75"
+                className="animate-fadeUp opacity-60 grayscale-[0.5]"
               >
-                <HustleBar name={hustle.name} target={hustle.revenue_target} current={hustle.current_revenue} />
+                <HustleBar id={hustle.id} name={hustle.name} goal={hustle.goal} budget={hustle.budget} color={hustle.color || '#444'} />
               </div>
             ))}
           </div>

@@ -1,7 +1,7 @@
 interface TaskCardProps {
   title: string
   description?: string
-  priority: 'urgent' | 'high' | 'medium'
+  priority: 'urgent' | 'high' | 'medium' | 'low'
   tag?: string
   tagColor?: string
   assignee?: string
@@ -24,6 +24,11 @@ const priorityConfig = {
     icon: '🔵',
     color: 'bg-hf-accent/15 text-hf-accent border-l-hf-accent',
     label: 'MEDIUM',
+  },
+  low: {
+    icon: '⚪',
+    color: 'bg-hf-muted/15 text-hf-muted border-l-hf-muted',
+    label: 'LOW',
   },
 }
 
