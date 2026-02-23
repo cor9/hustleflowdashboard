@@ -1,0 +1,121 @@
+/* ─── DESIGN SYSTEM COLORS ────────────────────────────── */
+:root {
+  --bg:        #080B12;
+  --surface:   #0E1220;
+  --surface2:  #141826;
+  --border:    #1E2538;
+  --border2:   #252D42;
+  --accent:    #3D7EFF;
+  --accent-dim:#1A3875;
+  --teal:      #1EC9A0;
+  --amber:     #F0A832;
+  --red:       #F04438;
+  --muted:     #3D4B6B;
+  --sub:       #6B7A9F;
+  --body:      #B8C2DA;
+  --head:      #E2E8F5;
+  --white:     #F0F4FF;
+  --mono:      'JetBrains Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+  --r:         8px;
+  --r-lg:      12px;
+  --nav-h:     56px;
+  --sidebar-w: 220px;
+}
+
+/* ─── RESET ───────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--body);
+  min-height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── ANIMATIONS ──────────────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ─── SCROLLBAR ───────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* ─── TYPOGRAPHY ──────────────────────────────────────── */
+.mono {
+  font-family: var(--mono);
+}
+
+.sans {
+  font-family: var(--sans);
+}
+
+/* ─── STATUS PILLS ────────────────────────────────────── */
+.status-pill {
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  font-family: var(--mono);
+}
+
+.status-pill.ok {
+  background: rgba(30, 201, 160, 0.12);
+  color: var(--teal);
+  border: 1px solid rgba(30, 201, 160, 0.2);
+}
+
+.status-pill.warn {
+  background: rgba(240, 168, 50, 0.12);
+  color: var(--amber);
+  border: 1px solid rgba(240, 168, 50, 0.2);
+}
+
+.status-pill.off {
+  background: rgba(61, 75, 107, 0.2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}

@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>HustleFlow — Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #080B12;
+    --surface:   #0E1220;
+    --surface2:  #141826;
+    --border:    #1E2538;
+    --border2:   #252D42;
+    --accent:    #3D7EFF;
+    --accent-dim:#1A3875;
+    --teal:      #1EC9A0;
+    --amber:     #F0A832;
+    --red:       #F04438;
+    --muted:     #3D4B6B;
+    --sub:       #6B7A9F;
+    --body:      #B8C2DA;
+    --head:      #E2E8F5;
+    --white:     #F0F4FF;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
+    --r:         8px;
+    --r-lg:      12px;
+    --nav-h:     56px;
+    --sidebar-w: 220px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { height: 100%; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--body);
+    min-height: 100%;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── TOPBAR ─────────────────────────────────────────────── */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: var(--nav-h);
+    background: rgba(8,11,18,0.92);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 16px;
+  }
+
+  .topbar-logo {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .topbar-logo span { color: var(--muted); }
+
+  .topbar-search {
+    flex: 1;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 0 12px;
+    height: 36px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  .topbar-search:hover { border-color: var(--border2); }
+  .topbar-search-icon { color: var(--muted); font-size: 13px; }
+  .topbar-search-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+  }
+  .topbar-search-kbd {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+
+  .topbar-right {
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .topbar-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--r);
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--sub);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .topbar-btn:hover { background: var(--surface); border-color: var(--border2); color: var(--body); }
+
+  .badge {
+    position: absolute; top: -4px; right: -4px;
+    min-width: 16px; height: 16px;
+    background: var(--red);
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--bg);
+  }
+
+  .vault-status {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sub);
+  }
+  .vault-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--teal);
+    box-shadow: 0 0 6px var(--teal);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* ─── LAYOUT ─────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    padding-top: var(--nav-h);
+    min-height: 100vh;
+  }
+
+  /* ─── SIDEBAR ────────────────────────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    position: fixed;
+    top: var(--nav-h); bottom: 0; left: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex; flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 90;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 89;
+  }
+  .sidebar-overlay.visible { display: block; }
+
+  .sidebar-section { padding: 16px 0 8px; }
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 0 16px 8px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sub);
+    cursor: pointer;
+    transition: all 0.12s;
+    border-left: 2px solid transparent;
+    text-decoration: none;
+  }
+  .nav-item:hover { color: var(--body); background: var(--surface2); }
+  .nav-item.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(61,126,255,0.08);
+  }
+  .nav-item-icon { font-size: 14px; width: 18px; text-align: center; }
+  .nav-item-label { flex: 1; }
+  .nav-item-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  /* Hustle entries */
+  .hustle-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 16px;
+    font-size: 12px;
+    color: var(--sub);
+    cursor: pointer;
+    transition: all 0.12s;
+    font-family: var(--mono);
+  }
+  .hustle-item:hover { color: var(--body); background: var(--surface2); }
+  .hustle-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .hustle-dot.active { background: var(--teal); box-shadow: 0 0 4px var(--teal); }
+  .hustle-dot.primary { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+  .hustle-dot.quiet { background: var(--muted); }
+  .hustle-name { flex: 1; font-size: 11px; }
+  .hustle-tier {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* Agent status in sidebar */
+  .agent-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 16px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--sub);
+  }
+  .agent-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .agent-dot.ready { background: var(--teal); }
+  .agent-dot.working { background: var(--amber); animation: pulse 1s infinite; }
+  .agent-dot.gated { background: var(--muted); }
+  .agent-dot.local { background: var(--accent); }
+  .agent-name { flex: 1; }
+  .agent-state { font-size: 9px; color: var(--muted); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sidebar-footer-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--teal));
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+  .sidebar-footer-info { flex: 1; }
+  .sidebar-footer-name { font-size: 12px; font-weight: 600; color: var(--head); }
+  .sidebar-footer-role { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+  /* ─── MAIN CONTENT ───────────────────────────────────────── */
+  .main {
+    flex: 1;
+    min-width: 0;
+    padding: 20px 16px 80px;
+    transition: margin-left 0.25s ease;
+  }
+
+  /* ─── GREETING ───────────────────────────────────────────── */
+  .greeting {
+    margin-bottom: 20px;
+    animation: fadeUp 0.4s ease both;
+  }
+  .greeting-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .greeting-text {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--head);
+    line-height: 1.3;
+  }
+  .greeting-text em {
+    font-style: normal;
+    color: var(--amber);
+  }
+  .greeting-sub {
+    font-size: 13px;
+    color: var(--sub);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── STAT STRIP ─────────────────────────────────────────── */
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+    animation: fadeUp 0.4s 0.05s ease both;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--head);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-value.red { color: var(--red); }
+  .stat-value.teal { color: var(--teal); }
+  .stat-value.amber { color: var(--amber); }
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* ─── SECTION HEADERS ────────────────────────────────────── */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+  .section-header:first-child { margin-top: 0; }
+  .section-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    width: 40px;
+  }
+  .section-action {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .section-action:hover { color: var(--head); }
+
+  /* ─── TASK CARDS ─────────────────────────────────────────── */
+  .task-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+
+  .task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 12px;
+    display: flex; gap: 10px; align-items: flex-start;
+    cursor: pointer;
+    transition: all 0.15s;
+    animation: fadeUp 0.3s ease both;
+    border-left: 3px solid var(--border);
+  }
+  .task-card:hover { border-color: var(--border2); background: var(--surface2); }
+  .task-card.urgent { border-left-color: var(--red); }
+  .task-card.high    { border-left-color: var(--amber); }
+  .task-card.medium  { border-left-color: var(--accent); }
+
+  .task-priority {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .task-priority.urgent { background: rgba(240,68,56,0.15); color: var(--red); }
+  .task-priority.high   { background: rgba(240,168,50,0.15); color: var(--amber); }
+  .task-priority.medium { background: rgba(61,126,255,0.15); color: var(--accent); }
+
+  .task-body { flex: 1; min-width: 0; }
+  .task-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--head);
+    line-height: 1.4;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .task-meta {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap;
+  }
+  .task-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .task-tag.ca101     { border-color: #3D7EFF33; color: var(--accent); }
+  .task-tag.prep101   { border-color: #1EC9A033; color: var(--teal); }
+  .task-tag.talent    { border-color: #F0A83233; color: var(--amber); }
+  .task-tag.coaching  { border-color: #A855F733; color: #A855F7; }
+  .task-tag.books     { border-color: #EC489933; color: #EC4899; }
+
+  .task-assignee {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .task-due {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .task-due.overdue { color: var(--red); }
+
+  /* ─── AGENT MONITOR CARDS ────────────────────────────────── */
+  .agent-cards { display: flex; flex-direction: column; gap: 6px; }
+
+  .agent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 12px;
+    display: flex; align-items: center; gap: 10px;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .agent-card:hover { border-color: var(--border2); background: var(--surface2); }
+
+  .agent-card-indicator {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .agent-card-indicator.ready   { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+  .agent-card-indicator.working { background: var(--amber); box-shadow: 0 0 6px var(--amber); animation: pulse 1s infinite; }
+  .agent-card-indicator.gated   { background: var(--muted); }
+  .agent-card-indicator.local   { background: var(--accent); box-shadow: 0 0 4px var(--accent); animation: pulse 3s infinite; }
+
+  .agent-card-info { flex: 1; min-width: 0; }
+  .agent-card-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--head);
+  }
+  .agent-card-tier {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .agent-card-right { text-align: right; }
+  .agent-card-status {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sub);
+  }
+  .agent-card-status.working { color: var(--amber); }
+  .agent-card-status.ready   { color: var(--teal); }
+  .agent-card-cost {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ─── HUSTLE GRID ────────────────────────────────────────── */
+  .hustle-grid { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Primary engines — large format */
+  .hustle-primary-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .hustle-primary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-top: 2px solid var(--accent);
+    position: relative;
+    overflow: hidden;
+  }
+  .hustle-primary-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(61,126,255,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hustle-primary-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+  .hustle-primary-card.bohemia { border-top-color: var(--amber); }
+  .hustle-primary-card.bohemia:hover { border-color: var(--amber); }
+  .hustle-primary-card.bohemia::after {
+    background: linear-gradient(135deg, rgba(240,168,50,0.04) 0%, transparent 60%);
+  }
+
+  .hustle-card-eyebrow {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .hustle-card-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--head);
+    margin-bottom: 2px;
+    font-family: var(--mono);
+  }
+  .hustle-card-desc {
+    font-size: 11px;
+    color: var(--sub);
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+  .hustle-card-stats {
+    display: flex; gap: 12px;
+  }
+  .hustle-stat {
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .hustle-stat-val { color: var(--head); font-weight: 700; }
+  .hustle-stat-key { color: var(--muted); display: block; font-size: 8px; }
+
+  .hustle-card-status {
+    position: absolute;
+    top: 10px; right: 10px;
+    font-family: var(--mono);
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+  .hustle-card-status.active   { background: rgba(30,201,160,0.12); color: var(--teal); border: 1px solid rgba(30,201,160,0.2); }
+  .hustle-card-status.needs    { background: rgba(240,168,50,0.12); color: var(--amber); border: 1px solid rgba(240,168,50,0.2); }
+
+  /* Revenue engines — compact row */
+  .hustle-revenue-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .hustle-rev-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .hustle-rev-card:hover { border-color: var(--border2); background: var(--surface2); }
+
+  .hustle-rev-icon {
+    font-size: 18px;
+    margin-top: 1px;
+    flex-shrink: 0;
+  }
+  .hustle-rev-info { flex: 1; min-width: 0; }
+  .hustle-rev-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--head);
+  }
+  .hustle-rev-type {
+    font-size: 10px;
+    color: var(--sub);
+    margin-top: 1px;
+  }
+  .hustle-rev-tasks {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .hustle-rev-tasks.has-tasks { color: var(--accent); }
+
+  /* ─── COST BAR ───────────────────────────────────────────── */
+  .cost-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 14px;
+  }
+  .cost-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .cost-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .cost-amount {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--teal);
+  }
+  .cost-amount span {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .cost-bar-wrap {
+    background: var(--surface2);
+    border-radius: 4px;
+    height: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .cost-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--teal), var(--accent));
+    transition: width 0.6s ease;
+  }
+  .cost-bar-labels {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .model-tiers {
+    margin-top: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .model-tier-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .model-tier-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sub);
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .model-tier-bar-wrap {
+    flex: 1;
+    background: var(--surface2);
+    border-radius: 3px;
+    height: 3px;
+    overflow: hidden;
+  }
+  .model-tier-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+  }
+  .model-tier-bar.t0 { background: var(--muted); }
+  .model-tier-bar.t1 { background: var(--teal); }
+  .model-tier-bar.t2 { background: var(--accent); }
+  .model-tier-bar.t3 { background: var(--red); }
+  .model-tier-pct {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    width: 28px;
+    text-align: right;
+  }
+
+  /* ─── ACTIVITY FEED ──────────────────────────────────────── */
+  .activity-feed { display: flex; flex-direction: column; }
+  .activity-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-icon {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .activity-body { flex: 1; min-width: 0; }
+  .activity-text {
+    font-size: 12px;
+    color: var(--body);
+    line-height: 1.4;
+  }
+  .activity-text strong { color: var(--head); }
+  .activity-time {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* ─── VAULT STATUS CARD ──────────────────────────────────── */
+  .vault-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 14px;
+    border-top: 2px solid var(--teal);
+  }
+  .vault-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .vault-row:last-child { border-bottom: none; }
+  .vault-row-key {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sub);
+  }
+  .vault-row-val {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--head);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .status-pill {
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+  }
+  .status-pill.ok   { background: rgba(30,201,160,0.12); color: var(--teal); border: 1px solid rgba(30,201,160,0.2); }
+  .status-pill.warn { background: rgba(240,168,50,0.12); color: var(--amber); border: 1px solid rgba(240,168,50,0.2); }
+  .status-pill.off  { background: rgba(61,75,107,0.2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ─── BOTTOM NAV (mobile) ────────────────────────────────── */
+  .bottom-nav {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(14,18,32,0.96);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    padding: 0 0 env(safe-area-inset-bottom, 0);
+  }
+
+  .bottom-nav-inner {
+    display: flex;
+    height: 56px;
+  }
+
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: color 0.15s;
+    font-family: var(--mono);
+    font-size: 9px;
+    text-decoration: none;
+    letter-spacing: 0.05em;
+  }
+  .bottom-nav-item:hover { color: var(--sub); }
+  .bottom-nav-item.active { color: var(--accent); }
+  .bottom-nav-icon { font-size: 18px; line-height: 1; }
+
+  /* ─── FAB ────────────────────────────────────────────────── */
+  .fab {
+    position: fixed;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    right: 16px;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    display: none;
+    align-items: center; justify-content: center;
+    font-size: 22px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(61,126,255,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 101;
+  }
+  .fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(61,126,255,0.5); }
+  .fab:active { transform: scale(0.95); }
+
+  /* ─── DIVIDER ────────────────────────────────────────────── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  /* ─── QUICK ACTIONS ──────────────────────────────────────── */
+  .quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .qa-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sub);
+  }
+  .qa-btn:hover { border-color: var(--border2); background: var(--surface2); color: var(--body); }
+  .qa-btn-icon { font-size: 16px; }
+
+  /* ─── RESPONSIVE ─────────────────────────────────────────── */
+
+  /* Tablet (768px+) */
+  @media (min-width: 768px) {
+    .sidebar { transform: translateX(0); }
+    .sidebar-overlay { display: none !important; }
+    .main { margin-left: var(--sidebar-w); padding: 24px 28px 40px; }
+    .topbar { left: 0; }
+    .topbar-menu-btn { display: none; }
+
+    .stat-strip { grid-template-columns: repeat(4, 1fr); }
+    .hustle-revenue-grid { grid-template-columns: repeat(3, 1fr); }
+    .bottom-nav { display: none; }
+    .fab { display: none; }
+
+    /* Two-column layout for desktop view */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .content-grid .full-width { grid-column: 1 / -1; }
+  }
+
+  /* Mobile (below 768px) */
+  @media (max-width: 767px) {
+    .bottom-nav { display: flex; flex-direction: column; }
+    .fab { display: flex; }
+    .vault-status-label { display: none; }
+    .stat-strip { grid-template-columns: repeat(2, 1fr); }
+    .hustle-primary-row { grid-template-columns: 1fr; }
+    .hustle-revenue-grid { grid-template-columns: repeat(2, 1fr); }
+    .topbar-search { max-width: none; }
+    .topbar-search .topbar-search-kbd { display: none; }
+  }
+
+  /* Large desktop (1100px+) */
+  @media (min-width: 1100px) {
+    .main { padding: 28px 40px 40px; }
+    .content-grid { grid-template-columns: 5fr 4fr; }
+    .hustle-revenue-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  /* ─── SCROLLBAR ──────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ─── HAMBURGER ──────────────────────────────────────────── */
+  .topbar-menu-btn {
+    width: 32px; height: 32px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: var(--r);
+    transition: background 0.15s;
+  }
+  .topbar-menu-btn:hover { background: var(--surface); }
+  .topbar-menu-btn span {
+    width: 16px; height: 1.5px;
+    background: var(--sub);
+    border-radius: 1px;
+    transition: all 0.2s;
+  }
+
+  @media (min-width: 768px) { .topbar-menu-btn { display: none; } }
+
+  /* ─── PAGE FADE ANIMATION ────────────────────────────────── */
+  .anim-1 { animation: fadeUp 0.35s 0.0s ease both; }
+  .anim-2 { animation: fadeUp 0.35s 0.06s ease both; }
+  .anim-3 { animation: fadeUp 0.35s 0.12s ease both; }
+  .anim-4 { animation: fadeUp 0.35s 0.18s ease both; }
+  .anim-5 { animation: fadeUp 0.35s 0.24s ease both; }
+  .anim-6 { animation: fadeUp 0.35s 0.30s ease both; }
+
+  /* ─── WEEKLY FOCUS BANNER ────────────────────────────────── */
+  .focus-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--r);
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .focus-banner:hover { border-color: var(--border2); }
+  .focus-banner-left { flex: 1; }
+  .focus-banner-eyebrow {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .focus-banner-engine {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--head);
+    margin-top: 1px;
+    font-family: var(--mono);
+  }
+  .focus-banner-engine span { color: var(--accent); }
+  .focus-banner-right {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── TOPBAR ──────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-menu-btn" onclick="toggleSidebar()" id="menuBtn">
+    <span></span><span></span><span></span>
+  </div>
+
+  <div class="topbar-logo">HF<span>.SITE</span></div>
+
+  <div class="topbar-search" onclick="openCommandPalette()">
+    <span class="topbar-search-icon">⌘</span>
+    <span class="topbar-search-label">Search or command...</span>
+    <span class="topbar-search-kbd">⌘K</span>
+  </div>
+
+  <div class="topbar-right">
+    <div class="vault-status">
+      <div class="vault-dot"></div>
+      <span class="vault-status-label" style="font-family:var(--mono);font-size:9px;">VAULT</span>
+    </div>
+    <div class="topbar-btn">
+      🔔
+      <div class="badge">3</div>
+    </div>
+    <div class="topbar-btn" style="font-size:11px;font-family:var(--mono);font-weight:700;color:var(--accent)">C</div>
+  </div>
+</header>
+
+<!-- ─── SIDEBAR OVERLAY ─────────────────────────────────────── -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- ─── SIDEBAR ────────────────────────────────────────────── -->
+<nav class="sidebar" id="sidebar">
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Navigate</div>
+    <a class="nav-item active" href="#">
+      <span class="nav-item-icon">⬛</span>
+      <span class="nav-item-label">Dashboard</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-item-icon">✓</span>
+      <span class="nav-item-label">Tasks</span>
+      <span class="nav-item-count">11</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-item-icon">📁</span>
+      <span class="nav-item-label">Documents</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-item-icon">🚀</span>
+      <span class="nav-item-label">Projects</span>
+      <span class="nav-item-count">9</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-item-icon">📅</span>
+      <span class="nav-item-label">Calendar</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-item-icon">🤖</span>
+      <span class="nav-item-label">Agents</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-item-icon">💬</span>
+      <span class="nav-item-label">Messages</span>
+      <span class="nav-item-count">2</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-item-icon">⚙</span>
+      <span class="nav-item-label">Skills & Tools</span>
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Hustles</div>
+
+    <div class="hustle-item">
+      <div class="hustle-dot primary"></div>
+      <span class="hustle-name">CA101</span>
+      <span class="hustle-tier">P1</span>
+    </div>
+    <div class="hustle-item">
+      <div class="hustle-dot primary" style="background:var(--amber);box-shadow:0 0 4px var(--amber)"></div>
+      <span class="hustle-name">Bohemia / Talent</span>
+      <span class="hustle-tier">P1</span>
+    </div>
+    <div class="hustle-item">
+      <div class="hustle-dot active"></div>
+      <span class="hustle-name">PREP101</span>
+      <span class="hustle-tier">R2</span>
+    </div>
+    <div class="hustle-item">
+      <div class="hustle-dot active"></div>
+      <span class="hustle-name">Coaching</span>
+      <span class="hustle-tier">R2</span>
+    </div>
+    <div class="hustle-item">
+      <div class="hustle-dot quiet"></div>
+      <span class="hustle-name">Directory</span>
+      <span class="hustle-tier">R2</span>
+    </div>
+    <div class="hustle-item">
+      <div class="hustle-dot quiet"></div>
+      <span class="hustle-name">Amazon</span>
+      <span class="hustle-tier">R2</span>
+    </div>
+    <div class="hustle-item">
+      <div class="hustle-dot quiet"></div>
+      <span class="hustle-name">Merch / WearPSA</span>
+      <span class="hustle-tier">R2</span>
+    </div>
+    <div class="hustle-item">
+      <div class="hustle-dot active" style="background:#EC4899;box-shadow:0 0 4px #EC4899"></div>
+      <span class="hustle-name">Books / KDP</span>
+      <span class="hustle-tier">R2</span>
+    </div>
+    <div class="hustle-item" style="color:var(--muted)">
+      <div class="hustle-dot quiet" style="background:var(--border)"></div>
+      <span class="hustle-name">+ Add hustle</span>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Agents</div>
+    <div class="agent-item">
+      <div class="agent-dot ready"></div>
+      <span class="agent-name">Coco</span>
+      <span class="agent-state">Partner · T1/T2</span>
+    </div>
+    <div class="agent-item">
+      <div class="agent-dot ready"></div>
+      <span class="agent-name">Max</span>
+      <span class="agent-state">Content · T1/T2</span>
+    </div>
+    <div class="agent-item">
+      <div class="agent-dot working"></div>
+      <span class="agent-name">Chaz</span>
+      <span class="agent-state">Revenue · T1</span>
+    </div>
+    <div class="agent-item">
+      <div class="agent-dot ready"></div>
+      <span class="agent-name">Sheila</span>
+      <span class="agent-state">Research · T1/T2</span>
+    </div>
+    <div class="agent-item">
+      <div class="agent-dot working"></div>
+      <span class="agent-name">Bob</span>
+      <span class="agent-state">Builder · T2/T3</span>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-avatar">C</div>
+    <div class="sidebar-footer-info">
+      <div class="sidebar-footer-name">Corey</div>
+      <div class="sidebar-footer-role">hustleflow.site</div>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── MAIN ────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- GREETING -->
+  <div class="greeting anim-1">
+    <div class="greeting-eyebrow">SAT · FEB 21, 2026 · 18:04</div>
+    <div class="greeting-text">Good evening, Corey. You have <em>3 urgent</em> tasks.</div>
+    <div class="greeting-sub">1 agent working · Claude Haiku on CA101 blog</div>
+  </div>
+
+  <!-- WEEKLY FOCUS BANNER -->
+  <div class="section-header anim-2" style="margin-top:0;margin-bottom:8px;">
+    <div class="section-title">Weekly Focus</div>
+    <a class="section-action" href="#">Change →</a>
+  </div>
+  <div class="focus-banner anim-2" style="margin-bottom:16px;">
+    <div class="focus-banner-left">
+      <div class="focus-banner-eyebrow">This week's primary engine</div>
+      <div class="focus-banner-engine"><span>CA101</span> — Child Actor 101</div>
+    </div>
+    <div class="focus-banner-right">
+      Week 8<br>of 52
+    </div>
+  </div>
+
+  <!-- STAT STRIP -->
+  <div class="stat-strip anim-2">
+    <div class="stat-card">
+      <div class="stat-value red">3</div>
+      <div class="stat-label">Urgent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">11</div>
+      <div class="stat-label">Open Tasks</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value teal">8</div>
+      <div class="stat-label">Done Today</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value amber">$312</div>
+      <div class="stat-label">MRR</div>
+    </div>
+  </div>
+
+  <!-- CONTENT GRID (two-col on desktop) -->
+  <div class="content-grid">
+
+    <!-- LEFT COLUMN -->
+    <div>
+
+      <!-- TODAY'S FOCUS TASKS -->
+      <div class="section-header anim-3">
+        <div class="section-title">Today's Focus</div>
+        <a class="section-action" href="#">All tasks →</a>
+      </div>
+
+      <div class="task-list anim-3">
+        <div class="task-card urgent">
+          <div class="task-priority urgent">🔴</div>
+          <div class="task-body">
+            <div class="task-title">Update email sequences for parent workshop</div>
+            <div class="task-meta">
+              <span class="task-tag ca101">CA101</span>
+              <span class="task-assignee">🤖 Gemini Flash</span>
+              <span class="task-due overdue">Due today</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-card urgent">
+          <div class="task-priority urgent">🔴</div>
+          <div class="task-body">
+            <div class="task-title">Send Q1 check-ins to 25 actor roster</div>
+            <div class="task-meta">
+              <span class="task-tag talent">TALENT</span>
+              <span class="task-assignee">👤 Corey</span>
+              <span class="task-due overdue">Due today</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-card urgent">
+          <div class="task-priority urgent">🔴</div>
+          <div class="task-body">
+            <div class="task-title">Connect OpenClaw to Qdrant on VPS node</div>
+            <div class="task-meta">
+              <span class="task-tag" style="border-color:#8B5CF633;color:#8B5CF6">INFRA</span>
+              <span class="task-assignee">👤 Corey</span>
+              <span class="task-due overdue">Due today</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-card high">
+          <div class="task-priority high">🟡</div>
+          <div class="task-body">
+            <div class="task-title">Build March coaching class schedule</div>
+            <div class="task-meta">
+              <span class="task-tag coaching">COACHING</span>
+              <span class="task-assignee">👤 Corey</span>
+              <span class="task-due">Feb 25</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-card high">
+          <div class="task-priority high">🟡</div>
+          <div class="task-body">
+            <div class="task-title">Analyze PREP101 onboarding drop-off</div>
+            <div class="task-meta">
+              <span class="task-tag prep101">PREP101</span>
+              <span class="task-assignee">🤖 Gemini Flash</span>
+              <span class="task-due">Feb 25</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="task-card medium">
+          <div class="task-priority medium">🔵</div>
+          <div class="task-body">
+            <div class="task-title">KDP competitor pricing research — Books</div>
+            <div class="task-meta">
+              <span class="task-tag books">BOOKS</span>
+              <span class="task-assignee">🤖 Gemini Flash</span>
+              <span class="task-due">Feb 28</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="section-header anim-4">
+        <div class="section-title">Quick Actions</div>
+      </div>
+      <div class="quick-actions anim-4">
+        <div class="qa-btn">
+          <span class="qa-btn-icon">➕</span>
+          New Task
+        </div>
+        <div class="qa-btn">
+          <span class="qa-btn-icon">🤖</span>
+          Assign to Agent
+        </div>
+        <div class="qa-btn">
+          <span class="qa-btn-icon">📁</span>
+          Upload File
+        </div>
+        <div class="qa-btn">
+          <span class="qa-btn-icon">💬</span>
+          Start Thread
+        </div>
+      </div>
+
+      <!-- HUSTLE GRID -->
+      <div class="section-header anim-5" style="margin-top:24px;">
+        <div class="section-title">Hustles</div>
+        <a class="section-action" href="#">Manage →</a>
+      </div>
+
+      <!-- PRIMARY ENGINES -->
+      <div style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;" class="anim-5">Primary Engines</div>
+      <div class="hustle-primary-row anim-5">
+        <div class="hustle-primary-card">
+          <span class="hustle-card-status active">Active</span>
+          <div class="hustle-card-eyebrow">P1 · Brand + Audience</div>
+          <div class="hustle-card-name">CA101</div>
+          <div class="hustle-card-desc">Child Actor 101 — blog, social, classes, workshops</div>
+          <div class="hustle-card-stats">
+            <div class="hustle-stat">
+              <span class="hustle-stat-val">11K+</span>
+              <span class="hustle-stat-key">community</span>
+            </div>
+            <div class="hustle-stat">
+              <span class="hustle-stat-val">3</span>
+              <span class="hustle-stat-key">tasks open</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hustle-primary-card bohemia">
+          <span class="hustle-card-status needs">Needs Attn</span>
+          <div class="hustle-card-eyebrow" style="color:var(--amber)">P1 · Primary Income</div>
+          <div class="hustle-card-name">Bohemia</div>
+          <div class="hustle-card-desc">Youth Talent Management — Bohemia Group</div>
+          <div class="hustle-card-stats">
+            <div class="hustle-stat">
+              <span class="hustle-stat-val" style="color:var(--amber)">25</span>
+              <span class="hustle-stat-key">on roster</span>
+            </div>
+            <div class="hustle-stat">
+              <span class="hustle-stat-val">5</span>
+              <span class="hustle-stat-key">tasks open</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REVENUE ENGINES -->
+      <div style="font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin:12px 0 6px;" class="anim-5">Revenue Engines</div>
+      <div class="hustle-revenue-grid anim-5">
+        <div class="hustle-rev-card">
+          <div class="hustle-rev-icon">⚡</div>
+          <div class="hustle-rev-info">
+            <div class="hustle-rev-name">PREP101</div>
+            <div class="hustle-rev-type">SaaS · $312/mo</div>
+            <div class="hustle-rev-tasks has-tasks">2 open</div>
+          </div>
+        </div>
+        <div class="hustle-rev-card">
+          <div class="hustle-rev-icon">🎭</div>
+          <div class="hustle-rev-info">
+            <div class="hustle-rev-name">Coaching</div>
+            <div class="hustle-rev-type">Services</div>
+            <div class="hustle-rev-tasks has-tasks">1 open</div>
+          </div>
+        </div>
+        <div class="hustle-rev-card">
+          <div class="hustle-rev-icon">📂</div>
+          <div class="hustle-rev-info">
+            <div class="hustle-rev-name">Directory</div>
+            <div class="hustle-rev-type">Vendor listings</div>
+            <div class="hustle-rev-tasks">quiet</div>
+          </div>
+        </div>
+        <div class="hustle-rev-card">
+          <div class="hustle-rev-icon">📚</div>
+          <div class="hustle-rev-info">
+            <div class="hustle-rev-name">Books/KDP</div>
+            <div class="hustle-rev-type">Publishing</div>
+            <div class="hustle-rev-tasks has-tasks">3 WIP</div>
+          </div>
+        </div>
+        <div class="hustle-rev-card">
+          <div class="hustle-rev-icon">🛒</div>
+          <div class="hustle-rev-info">
+            <div class="hustle-rev-name">Amazon</div>
+            <div class="hustle-rev-type">Affiliate</div>
+            <div class="hustle-rev-tasks">auto</div>
+          </div>
+        </div>
+        <div class="hustle-rev-card">
+          <div class="hustle-rev-icon">👕</div>
+          <div class="hustle-rev-info">
+            <div class="hustle-rev-name">WearablePSA</div>
+            <div class="hustle-rev-type">Merch/POD</div>
+            <div class="hustle-rev-tasks">auto</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /LEFT COLUMN -->
+
+    <!-- RIGHT COLUMN -->
+    <div>
+
+      <!-- VAULT / AGENTS -->
+      <div class="section-header anim-3">
+        <div class="section-title">Vault · Agents</div>
+        <a class="section-action" href="#">Full view →</a>
+      </div>
+
+      <div class="agent-cards anim-3">
+        <div class="agent-card">
+          <div class="agent-card-indicator ready"></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name">Coco</div>
+            <div class="agent-card-tier">Strategic Partner — Router / T1 + T2</div>
+          </div>
+          <div class="agent-card-right">
+            <div class="agent-card-status ready">online</div>
+            <div class="agent-card-cost">$0.00 mo</div>
+          </div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-indicator ready"></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name">Max</div>
+            <div class="agent-card-tier">Content Factory — Blog + Video + Copy</div>
+          </div>
+          <div class="agent-card-right">
+            <div class="agent-card-status ready">idle</div>
+            <div class="agent-card-cost">$3.20 mo</div>
+          </div>
+        </div>
+        <div class="agent-card" style="border-color: rgba(240,168,50,0.3)">
+          <div class="agent-card-indicator working"></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name">Chaz</div>
+            <div class="agent-card-tier">Revenue Optimization — Merch + Directory</div>
+          </div>
+          <div class="agent-card-right">
+            <div class="agent-card-status working">working</div>
+            <div class="agent-card-cost">$1.80 mo</div>
+          </div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-indicator ready"></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name">Sheila</div>
+            <div class="agent-card-tier">Research & Signal — Trends + Competitive</div>
+          </div>
+          <div class="agent-card-right">
+            <div class="agent-card-status ready">idle</div>
+            <div class="agent-card-cost">$2.40 mo</div>
+          </div>
+        </div>
+        <div class="agent-card" style="border-color: rgba(248,113,113,0.2)">
+          <div class="agent-card-indicator working"></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name">Bob</div>
+            <div class="agent-card-tier">Builder — Code + Infra + Automation</div>
+          </div>
+          <div class="agent-card-right">
+            <div class="agent-card-status working">working</div>
+            <div class="agent-card-cost">$4.60 mo</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COST PANEL -->
+      <div class="section-header anim-4">
+        <div class="section-title">AI Spend</div>
+        <a class="section-action" href="#">Ledger →</a>
+      </div>
+
+      <div class="cost-panel anim-4">
+        <div class="cost-header">
+          <div class="cost-title">Feb 2026</div>
+          <div class="cost-amount">$8.40<span> / $50 cap</span></div>
+        </div>
+        <div class="cost-bar-wrap">
+          <div class="cost-bar-fill" style="width:17%"></div>
+        </div>
+        <div class="cost-bar-labels">
+          <span>17% used</span>
+          <span>$41.60 remaining</span>
+        </div>
+
+        <div class="model-tiers">
+          <div class="model-tier-row">
+            <div class="model-tier-name">Coco</div>
+            <div class="model-tier-bar-wrap">
+              <div class="model-tier-bar t1" style="width:0%"></div>
+            </div>
+            <div class="model-tier-pct">—</div>
+          </div>
+          <div class="model-tier-row">
+            <div class="model-tier-name">Max</div>
+            <div class="model-tier-bar-wrap">
+              <div class="model-tier-bar t1" style="width:28%"></div>
+            </div>
+            <div class="model-tier-pct">38%</div>
+          </div>
+          <div class="model-tier-row">
+            <div class="model-tier-name">Chaz</div>
+            <div class="model-tier-bar-wrap">
+              <div class="model-tier-bar t1" style="width:16%"></div>
+            </div>
+            <div class="model-tier-pct">21%</div>
+          </div>
+          <div class="model-tier-row">
+            <div class="model-tier-name">Sheila</div>
+            <div class="model-tier-bar-wrap">
+              <div class="model-tier-bar t1" style="width:21%"></div>
+            </div>
+            <div class="model-tier-pct">29%</div>
+          </div>
+          <div class="model-tier-row">
+            <div class="model-tier-name">Bob</div>
+            <div class="model-tier-bar-wrap">
+              <div class="model-tier-bar t3" style="width:40%"></div>
+            </div>
+            <div class="model-tier-pct">55%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VAULT SYSTEM STATUS -->
+      <div class="section-header anim-5">
+        <div class="section-title">Node Status</div>
+        <a class="section-action" href="/system">System →</a>
+      </div>
+
+      <div class="vault-card anim-5">
+        <div class="vault-row">
+          <div class="vault-row-key">Vault (M1 node)</div>
+          <div class="vault-row-val"><span class="status-pill ok">Online</span></div>
+        </div>
+        <div class="vault-row">
+          <div class="vault-row-key">OpenClaw</div>
+          <div class="vault-row-val"><span class="status-pill ok">Running</span></div>
+        </div>
+        <div class="vault-row">
+          <div class="vault-row-key">Ollama</div>
+          <div class="vault-row-val"><span class="status-pill ok">Ready</span></div>
+        </div>
+        <div class="vault-row">
+          <div class="vault-row-key">VPS node</div>
+          <div class="vault-row-val"><span class="status-pill ok">Online</span></div>
+        </div>
+        <div class="vault-row">
+          <div class="vault-row-key">Qdrant</div>
+          <div class="vault-row-val"><span class="status-pill ok">12K vectors</span></div>
+        </div>
+        <div class="vault-row">
+          <div class="vault-row-key">Supabase</div>
+          <div class="vault-row-val"><span class="status-pill ok">Connected</span></div>
+        </div>
+        <div class="vault-row">
+          <div class="vault-row-key">Tailscale mesh</div>
+          <div class="vault-row-val"><span class="status-pill ok">5 peers</span></div>
+        </div>
+        <div class="vault-row">
+          <div class="vault-row-key">MailerLite MCP</div>
+          <div class="vault-row-val"><span class="status-pill warn">Degraded</span></div>
+        </div>
+      </div>
+
+      <!-- ACTIVITY FEED -->
+      <div class="section-header anim-6">
+        <div class="section-title">Activity</div>
+        <a class="section-action" href="#">All →</a>
+      </div>
+
+      <div class="activity-feed anim-6">
+        <div class="activity-item">
+          <div class="activity-icon">🤖</div>
+          <div class="activity-body">
+            <div class="activity-text"><strong>Max</strong> completed "CA101 week 8 ecosystem video outline"</div>
+            <div class="activity-time">2h ago · CA101 · Content</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon">🤖</div>
+          <div class="activity-body">
+            <div class="activity-text"><strong>Chaz</strong> generated "Directory money list + blockers report"</div>
+            <div class="activity-time">3h ago · Directory</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon">🤖</div>
+          <div class="activity-body">
+            <div class="activity-text"><strong>Sheila</strong> published "CA101 competitor analysis — Feb 2026"</div>
+            <div class="activity-time">5h ago · Research</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon">🤖</div>
+          <div class="activity-body">
+            <div class="activity-text"><strong>Bob</strong> deployed "Hustle Flow dashboard v2 (mobile-responsive)"</div>
+            <div class="activity-time">1h ago · Infrastructure</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-icon">📊</div>
+          <div class="activity-body">
+            <div class="activity-text"><strong>Coco</strong> routed "Directory heatmap cron report → Documents"</div>
+            <div class="activity-time">1d ago · Orchestration</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /RIGHT COLUMN -->
+
+  </div><!-- /content-grid -->
+
+</main>
+
+<!-- ─── BOTTOM NAV (mobile) ─────────────────────────────────── -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <a class="bottom-nav-item active" href="#">
+      <span class="bottom-nav-icon">⬛</span>
+      Dash
+    </a>
+    <a class="bottom-nav-item" href="#">
+      <span class="bottom-nav-icon">✓</span>
+      Tasks
+    </a>
+    <a class="bottom-nav-item" href="#">
+      <span class="bottom-nav-icon">🤖</span>
+      Agents
+    </a>
+    <a class="bottom-nav-item" href="#">
+      <span class="bottom-nav-icon">💬</span>
+      Messages
+    </a>
+    <a class="bottom-nav-item" href="#">
+      <span class="bottom-nav-icon">🚀</span>
+      Hustles
+    </a>
+  </div>
+</nav>
+
+<!-- ─── FAB ────────────────────────────────────────────────── -->
+<button class="fab" onclick="alert('Quick add: coming soon!')">＋</button>
+
+<script>
+  // ─── Sidebar toggle ──────────────────────────────────────────
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+
+  function toggleSidebar() {
+    const isOpen = sidebar.classList.contains('open');
+    isOpen ? closeSidebar() : openSidebar();
+  }
+  function openSidebar() {
+    sidebar.classList.add('open');
+    overlay.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('visible');
+    document.body.style.overflow = '';
+  }
+
+  // Close sidebar on nav item click (mobile)
+  document.querySelectorAll('.nav-item, .hustle-item').forEach(el => {
+    el.addEventListener('click', () => {
+      if (window.innerWidth < 768) closeSidebar();
+    });
+  });
+
+  // ─── ⌘K Command Palette stub ─────────────────────────────────
+  function openCommandPalette() {
+    // Will integrate with Next.js kbar or cmdk in real build
+    console.log('Command palette — wire up in Next.js with cmdk');
+  }
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      openCommandPalette();
+    }
+  });
+
+  // ─── Resize handler ──────────────────────────────────────────
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 768) closeSidebar();
+  });
+
+  // ─── Real-time clock ─────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    const d = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const t = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const el = document.querySelector('.greeting-eyebrow');
+    if (el) el.textContent = `${d.toUpperCase()} · ${t}`;
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  // ─── Stagger task card animations ────────────────────────────
+  document.querySelectorAll('.task-card').forEach((card, i) => {
+    card.style.animationDelay = `${0.18 + i * 0.05}s`;
+  });
+</script>
+
+</body>
+</html>
