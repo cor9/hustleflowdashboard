@@ -167,9 +167,19 @@ export default function ProjectDashboard() {
     }
 
     try {
-      const { data, error } = await supabase.from('tasks')
-        .insert({ ...newTaskObj, assigned_agent: nAgent || null })
-        .select().single();
+      const taskToInsert = {
+        title: nTitle,
+        status: nStatus,
+        priority: nPriority,
+        assigned_agent: nAgent || null,
+        hustle_id: projectId as string,
+      };
+
+      const { data, error } = await (supabase as any)
+        .from('tasks')
+        .insert(taskToInsert)
+        .select()
+        .single();
       if (error) throw error;
       setTasks(prev => [data, ...prev]);
       addToast('✓ Task added', 'ok');
