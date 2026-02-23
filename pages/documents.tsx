@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useEffect, useState } from "react";
 
 interface Document {
@@ -34,11 +36,11 @@ export default function DocumentsPage() {
           },
         }
       );
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const data: Document[] = await response.json();
       console.log("Documents fetched:", data.length);
       setDocuments(data);
@@ -149,11 +151,10 @@ export default function DocumentsPage() {
                   <button
                     key={doc.id}
                     onClick={() => setSelectedDoc(doc)}
-                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                      selectedDoc?.id === doc.id
+                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${selectedDoc?.id === doc.id
                         ? "bg-blue-600 text-white"
                         : "bg-dark-700 text-dark-300 hover:bg-dark-600"
-                    }`}
+                      }`}
                   >
                     <div className="font-medium text-xs truncate">{doc.title}</div>
                     <div className="text-xs text-dark-400 mt-1">{formatDate(doc.created_at)}</div>

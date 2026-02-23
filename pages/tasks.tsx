@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState } from 'react'
 import TaskCard from '../components/TaskCard'
 import SectionHeader from '../components/SectionHeader'
@@ -142,10 +144,10 @@ export default function TasksPage() {
                       task.tag === 'CA101'
                         ? 'border-hf-accent/20 text-hf-accent'
                         : task.tag === 'PREP101'
-                        ? 'border-hf-teal/20 text-hf-teal'
-                        : task.tag === 'TALENT'
-                        ? 'border-hf-amber/20 text-hf-amber'
-                        : 'border-hf-border text-hf-muted'
+                          ? 'border-hf-teal/20 text-hf-teal'
+                          : task.tag === 'TALENT'
+                            ? 'border-hf-amber/20 text-hf-amber'
+                            : 'border-hf-border text-hf-muted'
                     }
                     assignee={task.assignee}
                     dueDate={task.due_date}
