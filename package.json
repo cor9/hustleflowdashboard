@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.0.18",
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.38.0",
     "autoprefixer": "^10.4.16",
     "clsx": "^2.0.0",
