@@ -51,16 +51,18 @@ export default function Dashboard() {
   }, [])
 
   const loadData = async () => {
-    if (!supabase) return
+    if (!supabase) {
+      console.error('Supabase client is null — check env vars')
+      return
+    }
     try {
       setLoading(true)
-
       const [tasksRes, agentsRes, hustlesRes] = await Promise.all([
         supabase.from('tasks').select('*').limit(6).order('created_at', { ascending: false }),
         supabase.from('agents').select('*').limit(5).order('sort_order', { ascending: true }),
         supabase.from('hustles').select('*').order('sort_order', { ascending: true })
       ])
-
+      console.log('hustles:', hustlesRes.data, hustlesRes.error)
       setTasks(tasksRes.data || [])
       setAgents(agentsRes.data || [])
       setHustles(hustlesRes.data || [])
