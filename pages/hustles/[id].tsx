@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
+import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 
 // ── TYPES ────────────────────────────────────────────────
@@ -371,8 +372,10 @@ export default function ProjectDashboard() {
       </Head>
 
       <header className="topbar">
-        <div className="logo">HF<span>.SITE</span></div>
-        <div className="breadcrumb">
+        <Link href="/" className="flex-shrink-0">
+          <img src="/logo.png" alt="HustleFlow" className="h-8 md:h-10 hover:opacity-80 transition" />
+        </Link>
+        <div className="breadcrumb ml-4">
           <a href="/">Dashboard</a>
           <span className="sep">/</span>
           <a href="/hustles">Hustles</a>
