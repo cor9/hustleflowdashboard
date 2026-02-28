@@ -55,7 +55,7 @@ export default function DocumentsPage() {
   }
 
   const renderMarkdown = (content: string) => {
-    const lines = content.split("\n")
+    const lines = (content || "").split("\n")
     return (
       <div className="prose prose-invert max-w-none font-mono text-sm leading-relaxed">
         {lines.map((line, i) => {
