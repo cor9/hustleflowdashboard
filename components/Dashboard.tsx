@@ -92,7 +92,7 @@ export default function Dashboard() {
         urgent={urgentTasks.length}
         open={tasks.length}
         completed={0}
-        revenue={hustles.reduce((sum, h) => sum + (h.goal || 0), 0).toLocaleString()}
+        revenue={(hustles || []).reduce((sum, h) => sum + (h?.goal || 0), 0).toLocaleString()}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">

@@ -72,8 +72,8 @@ export default function HustlesPage() {
 
   const activeHustles = hustles.filter((h) => h.status === 'active')
   const otherHustles = hustles.filter((h) => h.status !== 'active')
-  const totalBudget = hustles.reduce((sum, h) => sum + (h.budget || 0), 0)
-  const totalGoal = hustles.reduce((sum, h) => sum + (h.goal || 0), 0)
+  const totalBudget = hustles.reduce((sum, h) => sum + (h?.budget || 0), 0)
+  const totalGoal = hustles.reduce((sum, h) => sum + (h?.goal || 0), 0)
 
   return (
     <div className="max-w-4xl">
