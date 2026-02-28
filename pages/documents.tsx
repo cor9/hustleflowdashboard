@@ -20,6 +20,7 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
   const [docContent, setDocContent] = useState<string>('')
+  const [docUrl, setDocUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,6 +30,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (selectedDoc) {
+      setDocUrl(null)
       if (selectedDoc.mime_type === 'text/markdown' || selectedDoc.mime_type === 'text/plain') {
         fetch(`/api/documents/download?path=${encodeURIComponent(selectedDoc.storage_path)}`)
           .then(async (res) => {
@@ -41,10 +43,22 @@ export default function DocumentsPage() {
           .then(text => setDocContent(text))
           .catch(err => setDocContent('Error loading document content: ' + err.message));
       } else {
-        setDocContent(`Document is of type ${selectedDoc.mime_type} and cannot be previewed in the current viewer. Download it directly from Supabase.`)
+        setDocContent('Loading secure viewer...')
+        fetch(`/api/documents/signed-url?path=${encodeURIComponent(selectedDoc.storage_path)}`)
+          .then(async (res) => {
+            if (!res.ok) throw new Error('Failed to generate viewer URL');
+            const data = await res.json();
+            return data.signedUrl;
+          })
+          .then(url => {
+            setDocUrl(url);
+            setDocContent('');
+          })
+          .catch(err => setDocContent('Error loading document viewer: ' + err.message));
       }
     } else {
       setDocContent('')
+      setDocUrl(null)
     }
   }, [selectedDoc])
 
@@ -129,7 +143,7 @@ export default function DocumentsPage() {
                 {documents.map((doc) => (
                   <button
                     key={doc.id}
-                    onClick={() => { setSelectedDoc(doc); setDocContent('Loading...'); }}
+                    onClick={() => { setSelectedDoc(doc); setDocContent('Loading...'); setDocUrl(null); }}
                     className={`w-full text-left px-4 py-3 border-b border-hf-border last:border-0 transition-colors ${selectedDoc?.id === doc.id
                       ? "bg-hf-accent/10 border-l-2 border-l-hf-accent"
                       : "hover:bg-hf-surface2"
@@ -161,7 +175,13 @@ export default function DocumentsPage() {
                   </div>
                 </div>
                 <div className="max-w-none">
-                  {renderMarkdown(docContent)}
+                  {selectedDoc.mime_type.startsWith('image/') && docUrl ? (
+                    <img src={docUrl} alt={selectedDoc.name} className="max-w-full rounded border border-hf-border shadow-lg" />
+                  ) : docUrl ? (
+                    <iframe src={docUrl} className="w-full h-[600px] border border-hf-border rounded bg-white shadow-lg" title={selectedDoc.name}></iframe>
+                  ) : (
+                    renderMarkdown(docContent)
+                  )}
                 </div>
               </div>
             ) : (
