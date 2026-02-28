@@ -27,7 +27,8 @@
         "name": "next"
       }
     ],
-    "isolatedModules": true
+    "isolatedModules": true,
+    "strictNullChecks": true
   },
   "include": [
     "next-env.d.ts",
