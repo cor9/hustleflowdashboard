@@ -7,21 +7,44 @@ import { supabase } from '../lib/supabase'
 
 interface Document {
   id: string
-  title: string
-  content: string
-  author: string
+  name: string
+  storage_path: string
+  mime_type: string
+  size_bytes: number
+  source: string
+  tags: string[]
   created_at: string
 }
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
+  const [docContent, setDocContent] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDocuments()
   }, [])
+
+  useEffect(() => {
+    if (selectedDoc) {
+      if (selectedDoc.mime_type === 'text/markdown' || selectedDoc.mime_type === 'text/plain') {
+        supabase.storage.from('documents').download(selectedDoc.storage_path)
+          .then(({ data, error }) => {
+            if (error) {
+              setDocContent('Error loading document content: ' + error.message)
+            } else if (data) {
+              data.text().then(t => setDocContent(t))
+            }
+          })
+      } else {
+        setDocContent(`Document is of type ${selectedDoc.mime_type} and cannot be previewed in the current viewer. Download it directly from Supabase.`)
+      }
+    } else {
+      setDocContent('')
+    }
+  }, [selectedDoc])
 
   const fetchDocuments = async () => {
     if (!supabase) return
@@ -57,8 +80,10 @@ export default function DocumentsPage() {
   const renderMarkdown = (content: string) => {
     const lines = (content || "").split("\n")
     return (
-      <div className="prose prose-invert max-w-none font-mono text-sm leading-relaxed">
-        {lines.map((line, i) => {
+      <div className="prose prose-invert max-w-none font-mono text-sm leading-relaxed whitespace-pre-wrap">
+        {lines.length === 0 || (lines.length === 1 && lines[0] === "") ? (
+          <p className="text-hf-muted italic">Downloading or processing document contents...</p>
+        ) : lines.map((line, i) => {
           if (line.startsWith("# ")) {
             return <h1 key={i} className="text-xl font-bold text-hf-head mt-6 mb-3 border-b border-hf-border pb-1">{line.replace("# ", "")}</h1>
           } else if (line.startsWith("## ")) {
@@ -102,13 +127,13 @@ export default function DocumentsPage() {
                 {documents.map((doc) => (
                   <button
                     key={doc.id}
-                    onClick={() => setSelectedDoc(doc)}
+                    onClick={() => { setSelectedDoc(doc); setDocContent('Loading...'); }}
                     className={`w-full text-left px-4 py-3 border-b border-hf-border last:border-0 transition-colors ${selectedDoc?.id === doc.id
                       ? "bg-hf-accent/10 border-l-2 border-l-hf-accent"
                       : "hover:bg-hf-surface2"
                       }`}
                   >
-                    <div className={`font-medium text-xs truncate ${selectedDoc?.id === doc.id ? 'text-hf-accent' : 'text-hf-head'}`}>{doc.title}</div>
+                    <div className={`font-medium text-xs truncate ${selectedDoc?.id === doc.id ? 'text-hf-accent' : 'text-hf-head'}`}>{doc.name}</div>
                     <div className="text-[10px] font-mono text-hf-muted mt-1 uppercase">{formatDate(doc.created_at)}</div>
                   </button>
                 ))}
@@ -122,17 +147,19 @@ export default function DocumentsPage() {
               <div className="bg-hf-surface border border-hf-border rounded-xs p-8 shadow-2xl min-h-[70vh]">
                 <div className="mb-8 pb-6 border-b border-hf-border">
                   <div className="font-mono text-[10px] text-hf-accent uppercase tracking-[0.3em] mb-2 font-bold">Document Content</div>
-                  <h1 className="text-2xl font-bold text-hf-head mb-4">{selectedDoc.title}</h1>
-                  <div className="flex items-center gap-4 text-[10px] font-mono text-hf-muted uppercase">
-                    <span>Author: {selectedDoc.author || 'System'}</span>
+                  <h1 className="text-2xl font-bold text-hf-head mb-4">{selectedDoc.name}</h1>
+                  <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono text-hf-muted uppercase">
+                    <span>Source: {selectedDoc.source || 'System'}</span>
                     <span className="w-1 h-1 bg-hf-border rounded-full" />
                     <span>Created: {formatDate(selectedDoc.created_at)}</span>
+                    <span className="w-1 h-1 bg-hf-border rounded-full" />
+                    <span>Type: {selectedDoc.mime_type}</span>
                     <span className="w-1 h-1 bg-hf-border rounded-full" />
                     <span>ID: {selectedDoc.id.slice(0, 8)}</span>
                   </div>
                 </div>
                 <div className="max-w-none">
-                  {renderMarkdown(selectedDoc.content)}
+                  {renderMarkdown(docContent)}
                 </div>
               </div>
             ) : (
