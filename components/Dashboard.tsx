@@ -51,10 +51,15 @@ export default function Dashboard() {
   }, [])
 
   const loadData = async () => {
-    if (!supabase) {
-      console.error('Supabase client is null — check env vars')
+    if (!supabase) return
+
+    // Wait for session to be confirmed before querying
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      console.error('No session — user not authenticated')
       return
     }
+
     try {
       setLoading(true)
       const [tasksRes, agentsRes, hustlesRes] = await Promise.all([
@@ -62,6 +67,7 @@ export default function Dashboard() {
         supabase.from('agents').select('*').limit(5).order('sort_order', { ascending: true }),
         supabase.from('hustles').select('*').order('sort_order', { ascending: true })
       ])
+      console.log('session uid:', session.user.id)
       console.log('hustles:', hustlesRes.data, hustlesRes.error)
       setTasks(tasksRes.data || [])
       setAgents(agentsRes.data || [])
@@ -73,8 +79,8 @@ export default function Dashboard() {
     }
   }
 
-  const primaryHustles = hustles.filter(h => h.tier.includes('P1'))
-  const revenueHustles = hustles.filter(h => h.tier.includes('R2'))
+  const primaryHustles = hustles.filter(h => h?.tier?.includes('P1'))
+  const revenueHustles = hustles.filter(h => h?.tier?.includes('R2'))
 
   const urgentTasks = tasks.filter(t => t.priority === 'urgent')
 
@@ -134,7 +140,7 @@ export default function Dashboard() {
                       description={h.description}
                       stats={[
                         { label: 'goal', value: `$${h.goal}` },
-                        { label: 'tier', value: h.tier.split(' · ')[0] },
+                        { label: 'tier', value: h?.tier?.split(' · ')[0] || '' },
                       ]}
                       status={h.status === 'active' ? 'active' : 'needs'}
                       isBohemia={h.name === 'Bohemia'}
@@ -157,7 +163,7 @@ export default function Dashboard() {
                       id={h.id}
                       icon="💰"
                       name={h.name}
-                      type={h.tier.split(' · ')[1]}
+                      type={h?.tier?.split(' · ')[1] || ''}
                       tasks="Active"
                       hasTasks={true}
                     />
