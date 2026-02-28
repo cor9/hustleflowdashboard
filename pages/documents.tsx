@@ -30,14 +30,16 @@ export default function DocumentsPage() {
   useEffect(() => {
     if (selectedDoc) {
       if (selectedDoc.mime_type === 'text/markdown' || selectedDoc.mime_type === 'text/plain') {
-        supabase.storage.from('documents').download(selectedDoc.storage_path)
-          .then(({ data, error }) => {
-            if (error) {
-              setDocContent('Error loading document content: ' + error.message)
-            } else if (data) {
-              data.text().then(t => setDocContent(t))
+        fetch(`/api/documents/download?path=${encodeURIComponent(selectedDoc.storage_path)}`)
+          .then(async (res) => {
+            if (!res.ok) {
+              const errInfo = await res.json().catch(() => ({ error: res.statusText }));
+              throw new Error(errInfo.error || 'Failed to download document');
             }
+            return res.text();
           })
+          .then(text => setDocContent(text))
+          .catch(err => setDocContent('Error loading document content: ' + err.message));
       } else {
         setDocContent(`Document is of type ${selectedDoc.mime_type} and cannot be previewed in the current viewer. Download it directly from Supabase.`)
       }
