@@ -404,12 +404,12 @@ export default function ProjectDashboard() {
           <div className="stats a2">
             <div className="stat">
               <div className="stat-lbl">Budget</div>
-              <div className="stat-val amber">${project.budget.toLocaleString()}</div>
+              <div className="stat-val amber">${(project.budget || 0).toLocaleString()}</div>
               <div className="stat-sub">allocated</div>
             </div>
             <div className="stat">
               <div className="stat-lbl">Revenue</div>
-              <div className="stat-val teal">${project.revenue.toLocaleString()}</div>
+              <div className="stat-val teal">${(project.revenue || 0).toLocaleString()}</div>
               <div className="stat-sub">this month</div>
             </div>
             <div className="stat">
@@ -419,7 +419,7 @@ export default function ProjectDashboard() {
             </div>
             <div className="stat">
               <div className="stat-lbl">Goal</div>
-              <div className="stat-val">${project.goal.toLocaleString()}</div>
+              <div className="stat-val">${(project.goal || 0).toLocaleString()}</div>
               <div className="stat-sub">target</div>
             </div>
           </div>
@@ -579,9 +579,9 @@ export default function ProjectDashboard() {
                 <div className="card-title">Project Info</div>
                 <div className="irow"><div className="ikey">Tier</div><div className="ival">{project.tier}</div></div>
                 <div className="irow"><div className="ikey">Status</div><div className="ival teal">{project.status}</div></div>
-                <div className="irow"><div className="ikey">Budget</div><div className="ival amber">${project.budget.toLocaleString()}</div></div>
-                <div className="irow"><div className="ikey">Revenue</div><div className="ival teal">${project.revenue.toLocaleString()}</div></div>
-                <div className="irow"><div className="ikey">Goal</div><div className="ival">${project.goal.toLocaleString()}</div></div>
+                <div className="irow"><div className="ikey">Budget</div><div className="ival amber">${(project.budget || 0).toLocaleString()}</div></div>
+                <div className="irow"><div className="ikey">Revenue</div><div className="ival teal">${(project.revenue || 0).toLocaleString()}</div></div>
+                <div className="irow"><div className="ikey">Goal</div><div className="ival">${(project.goal || 0).toLocaleString()}</div></div>
                 <div className="irow">
                   <div className="ikey">Created</div>
                   <div className="ival">
